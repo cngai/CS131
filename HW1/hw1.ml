@@ -125,20 +125,6 @@ let rec get_rules_with_start_symb rules start_symbol =
 		else get_rules_with_start_symb t start_symbol
 ;;
 
-(* let rec filter_nt_rules nt_rules rhs_nt_start =
-	match nt_rules with
-	| [] -> []
-	| (h1, h2) :: t ->
-		if find (N(h1)) rhs_nt_start then () *)
-
-(*
-collect and return list of all reachable rules
-let rec get_new_rules u_rules term_rules =
-	let terminals = get_nt_rules (good_rules u_rules term_rules) in
-	if (List.length term_rules) = (List.length terminals) then terminals
-	else get_new_rules u_rules terminals
-;;*)
-
 (* get list of all non-terminal rhs rules *)
 let rec get_rhs_nt nt_rules =
 	match nt_rules with
@@ -146,41 +132,38 @@ let rec get_rhs_nt nt_rules =
 	| h :: t -> remove_terminals (snd h @ get_rhs_nt t)
 ;;
 
-(* remove all terminal rules that do not match symbol type of any non-terminal rhs rules *)
-let rec filter_term_rules term_rules rhs_nt_rules =
-	match term_rules with
+(* remove all rules that do not match symbol type of any rhs rules *)
+let rec filter_rules rules rhs_rules =
+	match rules with
 	| [] -> []
 	| (h1, h2) :: t ->
-		if find (N(h1)) rhs_nt_rules then (h1, h2) :: (filter_term_rules t rhs_nt_rules)
-		else filter_term_rules t rhs_nt_rules
+		if find (N(h1)) rhs_rules then (h1, h2) :: (filter_rules t rhs_rules)
+		else filter_rules t rhs_rules
 ;;
 
-(* reorders new rules to be in same order as orig_rules *)
-let rec reorder_rules orig_rules new_rules =
+(* rearranges new rules to be in same order as original rules *)
+let rec sort_rules orig_rules new_rules =
 	match orig_rules with
 	| [] -> []
 	| h :: t ->
-		if find h new_rules then h :: (reorder_rules t new_rules)
-		else reorder_rules t new_rules
+		if find h new_rules then h :: (sort_rules t new_rules)
+		else sort_rules t new_rules
 ;;
 
-(* ways to change *)
-(* let term_rules = get_term_rules (snd g) || omit let rules = .. *)
-(* let new_rules = reorder_rules rules ... *)
-(* let non_term_rules = set_diff rules term_rules *)
-
 (* returns a copy of grammar g with all unreachable rules removed *)
+(* rules = all non-terminal and terminal rules *)
+(* term_rules = all terminal rules *)
+(* reachable_nt_rules = all non-terminal rules that have reachable rhs symbols *)
+(* nt_rules_start = non-terminal rules that match with start symbol *)
+(* filtered_nt_rules = all non-terminal rules that will be returned *)
+(* filtered_term_rules = all terminal rules that will be returned *)
 let filter_reachable g =
 	let rules = snd g in
 	let term_rules = get_term_rules rules in
-	let all_nt_rules = (get_nt_rules (good_rules (set_diff rules term_rules) term_rules) term_rules) in
-	(* let all_nt_rules = (get_nt_rules (good_rules (set_diff rules term_rules) term_rules) term_rules) in *)
-	let nt_rules_start = get_rules_with_start_symb all_nt_rules (fst g) in
-	(* let nt_rules = get_rhs_nt nt_rules_start in *)
-	let nt_rules = (set_union nt_rules_start (filter_term_rules all_nt_rules (get_rhs_nt nt_rules_start))) in
-	let filtered_term_rules = (set_union (get_rules_with_start_symb term_rules (fst g)) (filter_term_rules term_rules (get_rhs_nt nt_rules))) in
-	
-	(*let filtered_term_rules = filter_term_rules term_rules (get_rhs_nt nt_rules) in*)
+	let reachable_nt_rules = (get_nt_rules (good_rules (set_diff rules term_rules) term_rules) term_rules) in
+	let nt_rules_start = get_rules_with_start_symb reachable_nt_rules (fst g) in
+	let filtered_nt_rules = (set_union nt_rules_start (filter_rules reachable_nt_rules (get_rhs_nt nt_rules_start))) in
+	let filtered_term_rules = (set_union (get_rules_with_start_symb term_rules (fst g)) (filter_rules term_rules (get_rhs_nt filtered_nt_rules))) in
 	fst g,
-	(reorder_rules rules (nt_rules @ filtered_term_rules))
+	(sort_rules rules (filtered_nt_rules @ filtered_term_rules))
 ;;
