@@ -98,23 +98,26 @@ let rec get_lhs rules =
 	| h :: t -> (N(fst h) :: get_lhs t)
 ;;
 
-(* takes list of rules and returns list minus excl_rule *)
-(* makes sure nonterminal rule is not looping through itself *)
-let exclude_own_rule rules excl_rule =
-	set_diff rules [excl_rule]
+(* take list of rules but only return rhs without terminals *)
+let rec get_rhs rules =
+	match rules with
+	| [] -> []
+	| h :: t -> remove_terminals (snd h @ get_rhs t)
 ;;
 
+(* takes list of rules and returns list minus excl_rule *)
+(* makes sure nonterminal rule is not looping through itself *)
+let exclude_own_rule rules excl_rule = set_diff rules [excl_rule];;
+
 (* check to see if unknown rules can be reached from start symbol *)
-let rec good_rules u_rules term_rules =
+let rec reachable_rules u_rules term_rules =
 	match u_rules with
 	| [] -> term_rules
 	| (h1, h2) :: t ->
 		if subset (remove_terminals h2) ((get_lhs (exclude_own_rule u_rules (h1, h2))) @ (get_lhs term_rules)) && (not (find (h1, h2) term_rules))
-		then good_rules t ((h1, h2) :: term_rules)
-		else good_rules t term_rules
+		then reachable_rules t ((h1, h2) :: term_rules)
+		else reachable_rules t term_rules
 ;;
-
-let get_nt_rules all_rules term_rules = set_diff all_rules term_rules;;
 
 (* remove all non-terminal rules that cannot be immediately reached by start symbol *)
 let rec get_rules_with_start_symb rules start_symbol =
@@ -123,13 +126,6 @@ let rec get_rules_with_start_symb rules start_symbol =
 	| (h1, h2) :: t ->
 		if h1 = start_symbol then (h1, h2) :: (get_rules_with_start_symb t start_symbol)
 		else get_rules_with_start_symb t start_symbol
-;;
-
-(* get list of all non-terminal rhs rules *)
-let rec get_rhs_nt nt_rules =
-	match nt_rules with
-	| [] -> []
-	| h :: t -> remove_terminals (snd h @ get_rhs_nt t)
 ;;
 
 (* remove all rules that do not match symbol type of any rhs rules *)
@@ -160,10 +156,10 @@ let rec sort_rules orig_rules new_rules =
 let filter_reachable g =
 	let rules = snd g in
 	let term_rules = get_term_rules rules in
-	let reachable_nt_rules = (get_nt_rules (good_rules (set_diff rules term_rules) term_rules) term_rules) in
-	let nt_rules_start = get_rules_with_start_symb reachable_nt_rules (fst g) in
-	let filtered_nt_rules = (set_union nt_rules_start (filter_rules reachable_nt_rules (get_rhs_nt nt_rules_start))) in
-	let filtered_term_rules = (set_union (get_rules_with_start_symb term_rules (fst g)) (filter_rules term_rules (get_rhs_nt filtered_nt_rules))) in
+	let reachable_nt_rules = (set_diff (reachable_rules (set_diff rules term_rules) term_rules) term_rules) in
+	let nt_rules_start = (get_rules_with_start_symb reachable_nt_rules (fst g)) in
+	let filtered_nt_rules = (set_union nt_rules_start (filter_rules reachable_nt_rules (get_rhs nt_rules_start))) in
+	let filtered_term_rules = (set_union (get_rules_with_start_symb term_rules (fst g)) (filter_rules term_rules (get_rhs filtered_nt_rules))) in
 	fst g,
 	(sort_rules rules (filtered_nt_rules @ filtered_term_rules))
 ;;
