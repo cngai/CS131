@@ -3,14 +3,14 @@ type ('nonterminal, 'terminal) symbol =
   | N of 'nonterminal
   | T of 'terminal
 
-(* auxiliary function for subset *)
+(* return true if element is found in list *)
 let rec find e l =
 	match l with
 	| [] -> false
 	| h :: t -> h = e || find e t
 ;;
 
-(* returns true iff every element of list a is an element of list b *)
+(* returns true if every element of list a is an element of list b *)
 let rec subset a b =
 	match a with
 	| [] -> true
@@ -19,7 +19,7 @@ let rec subset a b =
 		else false
 ;;
 
-(* returns true iff two sets are equal *)
+(* returns true if two sets are equal *)
 let equal_sets a b = 
 	(subset a b) && (subset b a)
 ;;
@@ -83,12 +83,12 @@ let rec get_term_rules rules =
 ;;
 
 (* removes all terminal rules from rhs of rules pair *)
-let rec remove_terminals rhs =
+let rec remove_terms rhs =
 	match rhs with
 	| [] -> []
 	| h :: t ->
-		if is_terminal h then remove_terminals t
-		else h :: (remove_terminals t)
+		if is_terminal h then remove_terms t
+		else h :: (remove_terms t)
 ;;
 
 (* take list of rules but only return lhs *)
@@ -102,19 +102,19 @@ let rec get_lhs rules =
 let rec get_rhs rules =
 	match rules with
 	| [] -> []
-	| h :: t -> remove_terminals (snd h @ get_rhs t)
+	| h :: t -> remove_terms (snd h @ get_rhs t)
 ;;
 
 (* takes list of rules and returns list minus excl_rule *)
 (* makes sure nonterminal rule is not looping through itself *)
 let exclude_own_rule rules excl_rule = set_diff rules [excl_rule];;
 
-(* check to see if unknown rules can be reached from start symbol *)
-let rec reachable_rules u_rules term_rules =
-	match u_rules with
+(* check to see if non-terminal rules can be reached from start symbol *)
+let rec reachable_rules nt_rules term_rules =
+	match nt_rules with
 	| [] -> term_rules
 	| (h1, h2) :: t ->
-		if subset (remove_terminals h2) ((get_lhs (exclude_own_rule u_rules (h1, h2))) @ (get_lhs term_rules)) && (not (find (h1, h2) term_rules))
+		if subset (remove_terms h2) ((get_lhs (exclude_own_rule nt_rules (h1, h2))) @ (get_lhs term_rules))
 		then reachable_rules t ((h1, h2) :: term_rules)
 		else reachable_rules t term_rules
 ;;
