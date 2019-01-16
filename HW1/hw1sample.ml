@@ -29,8 +29,8 @@ let computed_fixed_point_test2 =
   computed_fixed_point (=) sqrt 10. = 1.
 let computed_fixed_point_test3 =
   ((computed_fixed_point (fun x y -> abs_float (x -. y) < 1.)
-			 (fun x -> x /. 2.)
-			 10.)
+       (fun x -> x /. 2.)
+       10.)
    = 1.25)
 
 (* An example grammar for a small subset of Awk.  *)
@@ -73,7 +73,17 @@ let awksub_test2 =
   filter_reachable (Lvalue, awksub_rules) = (Lvalue, awksub_rules)
 
 let awksub_test3 =
-  filter_reachable (Expr, List.tl (List.tl awksub_rules))
+  filter_reachable (Expr, List.tl (List.tl awksub_rules)) =
+    (Expr,
+     [Expr, [N Expr; N Binop; N Expr];
+      Expr, [N Lvalue];
+      Expr, [N Incrop; N Lvalue];
+      Expr, [N Lvalue; N Incrop];
+      Lvalue, [T "$"; N Expr];
+      Incrop, [T "++"];
+      Incrop, [T "--"];
+      Binop, [T "+"];
+      Binop, [T "-"]])
 
 let awksub_test4 =
   filter_reachable (Expr, List.tl (List.tl (List.tl awksub_rules))) =
@@ -84,3 +94,30 @@ let awksub_test4 =
       Lvalue, [T "$"; N Expr];
       Incrop, [T "++"];
       Incrop, [T "--"]])
+
+type giant_nonterminals =
+  | Conversation | Sentence | Grunt | Snore | Shout | Quiet
+
+let giant_grammar =
+  Conversation,
+  [Snore, [T"ZZZ"];
+   Quiet, [];
+   Grunt, [T"khrgh"];
+   Shout, [T"aooogah!"];
+   Sentence, [N Quiet];
+   Sentence, [N Grunt];
+   Sentence, [N Shout];
+   Conversation, [N Snore];
+   Conversation, [N Sentence; T","; N Conversation]]
+
+let giant_test0 =
+  filter_reachable giant_grammar = giant_grammar
+
+let giant_test1 =
+  filter_reachable (Sentence, List.tl (snd giant_grammar)) =
+    (Sentence,
+     [Quiet, []; Grunt, [T "khrgh"]; Shout, [T "aooogah!"];
+      Sentence, [N Quiet]; Sentence, [N Grunt]; Sentence, [N Shout]])
+
+let giant_test2 =
+  filter_reachable (Quiet, snd giant_grammar) = (Quiet, [Quiet, []])

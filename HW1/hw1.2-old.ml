@@ -174,10 +174,9 @@ let filter_reachable g =
 	let rules = snd g in
 	let term_rules = get_term_rules rules in
 	let all_nt_rules = (get_nt_rules (good_rules (set_diff rules term_rules) term_rules) term_rules) in
-	(* let all_nt_rules = (get_nt_rules (good_rules (set_diff rules term_rules) term_rules) term_rules) in *)
 	let nt_rules_start = get_rules_with_start_symb all_nt_rules (fst g) in
 	(* let nt_rules = get_rhs_nt nt_rules_start in *)
-	let nt_rules = (set_union nt_rules_start (filter_term_rules all_nt_rules (get_rhs_nt nt_rules_start))) in
+	let nt_rules = (filter_term_rules all_nt_rules (get_rhs_nt nt_rules_start)) in
 	let filtered_term_rules = (set_union (get_rules_with_start_symb term_rules (fst g)) (filter_term_rules term_rules (get_rhs_nt nt_rules))) in
 	
 	(*let filtered_term_rules = filter_term_rules term_rules (get_rhs_nt nt_rules) in*)
