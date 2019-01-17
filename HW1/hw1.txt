@@ -1,0 +1,25 @@
+For almost all my functions for problems 1 to 6, I used pattern matching
+because a lot of these problems dealt with lists. Pattern matching is especially
+powerful when dealing with lists because you can match a list to an empty set or
+anything else, which could help you when iterating through a list and also when
+recursively calling a function.
+
+As for problem 7, I created my 'filter_reachable' function by essentially having local
+variables that represent each "stage" of its filtering process. I used many helper
+functions to obtain these local variables and eventually the end pair. For example,
+to obtain 'term_rules' I call the 'get_term_rules' function which, using other helper
+functions, returns the subset of rules that only have terminal rules on its RHS. Other
+filtering tests I went through included removing any rule with non-terminal rules on
+its RHS that will never reach any of other rule. Also, I have a test that removes any
+rule that can't be reached by the start symbol. Finally, I have another test that
+removes any terminal rules that can't be reached by any of the non-terminal RHS rules.
+Through these series of filtering tests, I ultimately end up with a list of
+valid non-terminal rules and a list of valid terminal rules, which I concatenate together
+and sort so that it matches the order of the original list of rules.
+
+The weaknesses in my solution are that my filtering tests are very specific and strict in
+a sense that they test particular properties of rules. The downside of this is that it
+might make my solution less efficient because I could've come up with a more general
+solution that solves multiple specific violations at once instead of solving each
+individual one. Also, another downside is that specific filtering tests may cause you
+to miss other edge cases.
