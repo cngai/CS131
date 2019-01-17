@@ -1,4 +1,4 @@
-(*let my_subset_test0 = subset [] []
+let my_subset_test0 = subset [] []
 let my_subset_test1 = subset [] [2;4]
 let my_subset_test2 = subset [1;1] [4;1]
 let my_subset_test3 = subset [1;1] [1]
@@ -41,28 +41,45 @@ let my_computed_fixed_point_test2 = computed_fixed_point (=) (fun x -> x *. 5.) 
 let my_computed_fixed_point_test3 = computed_fixed_point (=) exp 1.= infinity
 let my_computed_fixed_point_test4 = computed_fixed_point (=) sqrt 100000. = 1.
 let my_computed_fixed_point_test5 = computed_fixed_point (=) (fun x -> x / 5) 999999 = 0
-let my_computed_fixed_point_test6 = computed_fixed_point (=) (fun x -> x *. 5.) (-1.) = neg_infinity *)
+let my_computed_fixed_point_test6 = computed_fixed_point (=) (fun x -> x *. 5.) (-1.) = neg_infinity 
 
 type fr_nonterminals =
-  | One | Two | Three | Four | Five
+  | One | Two | Three | Four | Five | Six
 
 let fr_rules =
-   [One, [T"32"; N Two; T"29"];
-    One, [N Five; T"1"];
-    Two, [N Four; N Three; N One];
-    Two, [N Two];
-    Two, [N Two; N Three];
-    Three, [N Four; N Five];
-    Three, [T"-"; N One];
-    Four, [T"random1"];
-    Five, [T"random2"];
-    Five, [T"random3"];
-    Five, [T"random4"];
-    Five, [T"random5"];
-    Five, [T"random6"];
-    Five, [T"random7"];
-    Five, [T"random8"]]
+   [One, [T"+"; N One; T"-"];
+    One, [N Five; N Six];
+    One, [N One; N Four; N One];
+    One, [N Two];
+    One, [N Three; N Two];
+    One, [N Two; N Three];
+    Two, [T"^"; N One];
+    Three, [T","];
+    Three, [T"!"];
+    Four, [T"="];
+    Four, [T"~"];
+    Five, [T"n"];
+    Five, [T")"];
+    Five, [T";"];
+    Five, [T"+"];
+    Six, []]
 
 let fr_grammar = One, fr_rules
 
-let my_filter_reachable_test0 = filter_reachable fr_grammar
+let my_filter_reachable_test0 = filter_reachable fr_grammar = fr_grammar
+let my_filter_reachable_test1 = filter_reachable (One, List.tl fr_rules) = (One, List.tl fr_rules)
+let my_filter_reachable_test2 = filter_reachable (One, List.tl (List.tl fr_rules)) =
+        (One,
+        [One, [N One; N Four; N One];
+        One, [N Two];
+        One, [N Three; N Two];
+        One, [N Two; N Three];
+        Two, [T "^"; N One];
+        Three, [T ","];
+        Three, [T"!"];
+        Four, [T"="];
+        Four, [T"~"]])
+
+let my_filter_reachable_test3 = filter_reachable (Six, fr_rules) = (Six, [Six, []])
+let my_filter_reachable_test4 = filter_reachable (Two, fr_rules) = (Two, fr_rules)
+
