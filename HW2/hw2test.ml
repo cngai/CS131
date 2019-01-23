@@ -38,10 +38,8 @@ let my_is_leaf_test0 = is_leaf (Leaf "L3")
 let my_is_leaf_test1 = not (is_leaf (Node ("N2", [Leaf "L2"])))
 let my_is_leaf_test2 = not (is_leaf (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5])])))
 
-(* let my_iterate_list_test0 = iterate_list ([Leaf "L1"; (Node ("N2", [Leaf "L2"])); Leaf "L3"]) ([]) *)
-(* 
-let my_parse_tree_list_test0 = parse_tree_list parse_tree [] *)
-
 let my_parse_tree_leaves_test0 = parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5])]))
 let my_parse_tree_leaves_test1 = parse_tree_leaves (Leaf 3)
 let my_parse_tree_leaves_test2 = parse_tree_leaves (Node ("N1", [Leaf "L1"; (Node ("N2", [Leaf "L2"])); Leaf "L3"]))
+let my_parse_tree_leaves_test3 = parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5]); Leaf 6]))
+let my_parse_tree_leaves_test3 = parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5]); Leaf 6; Node ("-", [Leaf 7; Leaf 8])]))
