@@ -72,10 +72,10 @@ let make_matcher gram =
     (fun accept frag -> matcher start_symb prod_func (prod_func start_symb) accept frag)
 ;;
 
-let rec iterate_each_list new_list prod_func frag=
+let rec iterate_each_list new_list prod_func frag start_symb rem_alt_list=
     match new_list with
     (* reached end of new_list, you didn't match anything, return None *)
-    | [] -> []
+    | [] -> iterate_alt_list start_symb prod_func rem_alt_list frag
     | _ ->
         match frag with
         (* reached end of frag, frag is satisfied, should only return [Leaf x :: []] which is just [Leaf x] *)
@@ -85,13 +85,17 @@ let rec iterate_each_list new_list prod_func frag=
             | [] -> []
             | (T t_val) :: rem_new_list ->
                 (* reached LEAF NODE, want to return Leaf t_val *)
-                if h_frag = t_val then ([Leaf t_val] @ (iterate_each_list rem_new_list prod_func rem_frag))
+                if h_frag = t_val then ([Leaf t_val] @ (iterate_each_list rem_new_list prod_func rem_frag start_symb rem_alt_list))
                 (* keep iterating through rem_new_list with same frag *)
-                else iterate_each_list rem_new_list prod_func frag
+                else (iterate_each_list rem_new_list prod_func frag start_symb rem_alt_list)
             | (N nt_val) :: rem_new_list ->
                 (* take N nt_val and iterate alt list again with nt_val as new start_symbol *)
                 (* will return Some (Node (val, [...])) *)
-                [(Node (nt_val, (iterate_alt_list nt_val prod_func (prod_func nt_val) frag)))]                     
+                let empty_or_not = (iterate_alt_list nt_val prod_func (prod_func nt_val) frag) in
+                match empty_or_not with
+                (* backtrack b/c wrong path *)
+                | [] -> iterate_alt_list start_symb prod_func rem_alt_list frag
+                | _ -> [(Node (nt_val, empty_or_not))]                     
 and iterate_alt_list start_symb prod_func alt_list frag =
     (* iterate through alt_list and try all lists in alt_list *)
     match alt_list with
@@ -99,7 +103,7 @@ and iterate_alt_list start_symb prod_func alt_list frag =
     | [] -> []
     | h_alt_list :: rem_alt_list ->
         (* iterate through individual list of rules, returns Node or Leaf *)
-        (iterate_each_list h_alt_list prod_func frag)
+        (iterate_each_list h_alt_list prod_func frag start_symb rem_alt_list)
 ;;
 
 let accept_all string = Some string;;
