@@ -20,20 +20,6 @@ let convert_grammar gram1 =
 	(fst gram1), (function nt_val -> get_alt_list (snd gram1) nt_val)
 ;;
 
-(* returns true if leaf, false if node *)
-let is_leaf symbol =
-	match symbol with
-	| Node (x, y) -> false
-	| Leaf x -> true
-;;
-
-(* takes in symbol ==> Leaf x, returns only x *)
-let delete_type symbol =
-    match symbol with
-    | Leaf x -> x
- (*    | Node (x, y) -> x *)
-;;
-
 (* mutually recursive function that adds leaves to leaves_list *)
 let rec parse_tree_list tree leaves_list =
 	match tree with
@@ -43,9 +29,7 @@ let rec parse_tree_list tree leaves_list =
 and iterate_list l leaves_list =
 	match l with
 	| [] -> leaves_list
-	| h :: t -> 
-		if is_leaf h then (delete_type h) :: (iterate_list t leaves_list)
-		else (parse_tree_list h leaves_list) @ (iterate_list t leaves_list)
+	| h :: t -> (parse_tree_list h leaves_list) @ (iterate_list t leaves_list)
 ;;
 
 (* traverses parse tree left to right and yields list of leaves encountered *)
@@ -53,47 +37,88 @@ let parse_tree_leaves tree =
 	parse_tree_list tree []
 ;;
 
-let match_term symbol accept frag =
-    match frag with
-    | [] -> None
-    | h :: t ->
-        if h = symbol then (accept t)
-        else None
+let rec matcher start_symb prod_func alt_list accept frag =
+    match alt_list with
+    | [] -> None (* could not find frag in entire prod_func *)
+    | h_alt_list :: rem_alt_list ->
+        let element = (match_element prod_func h_alt_list accept frag) in
+        match element with
+        | None -> matcher start_symb prod_func rem_alt_list accept frag (* keep trying to find element with rest of alt_list *)
+        | Some x -> Some x
+and match_element prod_func rhs_rules accept frag =
+    match rhs_rules with
+    | [] -> accept frag (* made it to end of rhs_rules, will return Some x *)
+    | _ -> (* somewhere in middle of rhs_rules *)
+        match frag with
+        | [] -> None (* reached end of frag, will call matcher again with next set of rhs_rules *)
+        | h_frag :: rem_frag ->
+            match rhs_rules with
+            | [] -> None (* made it to end of rhs_rules *)
+            | (T t_val) :: rem_rules ->
+                (* call match_element again with next rhs_rules and next frag *)
+                if h_frag = t_val then (match_element prod_func rem_rules accept rem_frag)
+                (* wrong path, next set of rhs_rules *)
+                else None
+            | (N nt_val) :: rem_rules ->
+                (* new acceptor made with remaining rules *)
+                let new_accept = (match_element prod_func rem_rules accept) in
+                (* call matcher but with new nt_val as start symbol *)
+                matcher nt_val prod_func (prod_func nt_val) new_accept frag
 ;;
 
-let rec append_matchers m1 matchers =
-    match matchers with
-    | [] -> m1
-    | h :: t -> (append_matchers (fun accept -> m1 (fun frag -> h accept frag)) t)
-;;
-
-(* non-terminal symbol matcher *)
-let rec match_nt pf ss al accept frag =
-    match al with
-    | [] -> None
-    | h1 :: t1 ->
-        let matcher = (
-            match h1 with
-            | [] -> None
-            | h2 :: t2 -> 
-                (append_matchers 
-                    (match_maker pf h2)
-                    (List.map (match_maker pf) t2)
-                accept frag
-                )
-        ) in
-        if matcher = None then match_nt pf ss t1 accept frag
-        else matcher
-and match_maker pf symbol =
-    match symbol with
-    | N x -> match_nt pf x (pf x)
-    | T x -> match_term x
-;;
-
-(* returns matcher for grammar gram *)
 let make_matcher gram =
-    match gram with
-    | (start_symb, prod_func) -> let alt_list = (prod_func start_symb) in
-        (fun accept frag -> match_nt prod_func start_symb alt_list accept frag)
+    let start_symb = fst gram in
+    let prod_func = snd gram in
+    (fun accept frag -> matcher start_symb prod_func (prod_func start_symb) accept frag)
 ;;
 
+let rec iterate_each_list new_list prod_func frag =
+    match new_list with
+    (* reached end of new_list, you didn't match anything, return None *)
+    | [] -> None
+    | h_new_list :: rem_new_list ->
+        match h_new_list with
+        | T t_val ->
+            (* reached LEAF NODE, want to return Leaf t_val *)
+            match frag with
+            (* reached end of frag, frag is satisfied, should only return [Leaf x :: []] which is just [Leaf x] *)
+            | [] -> []
+            | h_frag :: rem_frag ->
+                (* will give us some list like [Leaf "$"; Node(Expr, [...])] *)
+                if h_frag = t_val then (Leaf t_val) :: (iterate_each_list rem_new_list prod_func rem_frag)
+                (* keep iterating through rem_new_list with same frag *)
+                else iterate_each_list rem_new_list prod_func frag
+        | N nt_val ->
+            (* take N nt_val and iterate alt list again with nt_val as new start_symbol *)
+            (* will return Some (Node (val, [...])) *)
+            Some (Node (nt_val, (iterate_alt_list nt_val prod_func (prod_func nt_val) frag)))
+and iterate_alt_list start_symb prod_func alt_list frag =
+    (* iterate through alt_list and try all lists in alt_list *)
+    match alt_list with
+    (* reached end of alt_list, you didn't match anything, return None *)
+    | [] -> None
+    | h_alt_list :: rem_alt_list ->
+        (* iterate through individual list of rules, returns Node or Leaf *)
+        let some_or_none = (iterate_each_list h_alt_list prod_func frag) in
+        match some_or_none with
+        (* if None, keep iterating through rem_alt_list *)
+        | None -> iterate_alt_list start_symb prod_func rem_alt_list frag
+        (* got some sort of valid match Some *)
+        | Some node_val -> node_val
+;;
+
+let accept_all string = Some string;;
+
+let check_matcher gram frag =
+    let start_symb = fst gram in
+    let prod_func = snd gram in
+    if (make_matcher gram accept_all frag) = (Some [])
+    (* this Some is the actual Some in the answer *)
+    then Some (iterate_alt_list start_symb prod_func (prod_func start_symb) frag)
+    else None
+;;
+
+let make_parser gram =
+    (fun frag -> check_matcher gram frag)
+;;
+    
