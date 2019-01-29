@@ -3,38 +3,38 @@ type ('terminal, 'nonterminal) symbol =
     | N of 'nonterminal
 
 type ('nonterminal, 'terminal) parse_tree =
-  	| Node of 'nonterminal * ('nonterminal, 'terminal) parse_tree list
-  	| Leaf of 'terminal
+    | Node of 'nonterminal * ('nonterminal, 'terminal) parse_tree list
+    | Leaf of 'terminal
 
 (* convert gram1 rules into production function *)
 let rec get_alt_list rules nt_val =
-	match rules with
-	| [] -> []
-	| (h1, h2) :: t ->
-		if h1 = nt_val then h2 :: (get_alt_list t nt_val)
-		else get_alt_list t nt_val
+    match rules with
+    | [] -> []
+    | (h1, h2) :: t ->
+        if h1 = nt_val then h2 :: (get_alt_list t nt_val)
+        else get_alt_list t nt_val
 ;;
 
 (* conerts hw1 style grammar to hw2 style grammar *)
 let convert_grammar gram1 =
-	(fst gram1), (function nt_val -> get_alt_list (snd gram1) nt_val)
+    (fst gram1), (function nt_val -> get_alt_list (snd gram1) nt_val)
 ;;
 
 (* mutually recursive function that adds leaves to leaves_list *)
 let rec parse_tree_list tree leaves_list =
-	match tree with
-	| Leaf x -> x :: leaves_list
-	| Node (x, y) -> iterate_list y leaves_list
+    match tree with
+    | Leaf x -> x :: leaves_list
+    | Node (x, y) -> iterate_list y leaves_list
 (* iterates through list of symbols if symbol is a Node *)
 and iterate_list l leaves_list =
-	match l with
-	| [] -> leaves_list
-	| h :: t -> (parse_tree_list h leaves_list) @ (iterate_list t leaves_list)
+    match l with
+    | [] -> leaves_list
+    | h :: t -> (parse_tree_list h leaves_list) @ (iterate_list t leaves_list)
 ;;
 
 (* traverses parse tree left to right and yields list of leaves encountered *)
 let parse_tree_leaves tree =
-	parse_tree_list tree []
+    parse_tree_list tree []
 ;;
 
 let rec matcher start_symb prod_func alt_list accept frag =
@@ -72,52 +72,35 @@ let make_matcher gram =
     (fun accept frag -> matcher start_symb prod_func (prod_func start_symb) accept frag)
 ;;
 
-let rec iterate_each_list new_list prod_func frag start_symb rem_alt_list=
-    match new_list with
-    (* reached end of new_list, you didn't match anything, return None *)
-    | [] -> iterate_alt_list start_symb prod_func rem_alt_list frag
-    | _ ->
-        match frag with
-        (* reached end of frag, frag is satisfied, should only return [Leaf x :: []] which is just [Leaf x] *)
-        | [] -> []
-        | h_frag :: rem_frag ->
-            match new_list with
-            | [] -> []
-            | (T t_val) :: rem_new_list ->
-                (* reached LEAF NODE, want to return Leaf t_val *)
-                if h_frag = t_val then ([Leaf t_val] @ (iterate_each_list rem_new_list prod_func rem_frag start_symb rem_alt_list))
-                (* keep iterating through rem_new_list with same frag *)
-                else (iterate_each_list rem_new_list prod_func frag start_symb rem_alt_list)
-            | (N nt_val) :: rem_new_list ->
-                (* take N nt_val and iterate alt list again with nt_val as new start_symbol *)
-                (* will return Some (Node (val, [...])) *)
-                let empty_or_not = (iterate_alt_list nt_val prod_func (prod_func nt_val) frag) in
-                match empty_or_not with
-                (* backtrack b/c wrong path *)
-                | [] -> iterate_alt_list start_symb prod_func rem_alt_list frag
-                | _ -> [(Node (nt_val, empty_or_not))]                     
-and iterate_alt_list start_symb prod_func alt_list frag =
-    (* iterate through alt_list and try all lists in alt_list *)
-    match alt_list with
-    (* reached end of alt_list, you didn't match anything, return None *)
+let rec get_new_deriv t_list rem_deriv =
+    match t_list with
     | [] -> []
-    | h_alt_list :: rem_alt_list ->
-        (* iterate through individual list of rules, returns Node or Leaf *)
-        (iterate_each_list h_alt_list prod_func frag start_symb rem_alt_list)
+    | (T t_val) :: rem_t_list -> []
+    | (N n_val) :: rem_t_list -> (* n_val holds Incrop *)
+        match rem_deriv with
+        | [] -> []
+        | (x, x_list) :: t_deriv -> (* x holds Lvalue, Expr, Term, ... *)
+            if n_val = x then rem_deriv
+            else get_new_deriv t_list t_deriv
 ;;
 
-let accept_all string = Some string;;
-
-let check_matcher gram frag =
-    let start_symb = fst gram in
-    let prod_func = snd gram in
-    if (make_matcher gram accept_all frag) = (Some [])
-    (* this Some is the actual Some in the answer *)
-    then Some (Node (start_symb, (iterate_alt_list start_symb prod_func (prod_func start_symb) frag)))
-    else None
+let rec iterate_x_list x_list rem_deriv gram =
+    match x_list with
+    | [] -> []
+    | h_list :: t_list ->
+        match h_list with
+        | (T t_val) -> ([Leaf t_val] @ (iterate_x_list t_list rem_deriv gram))
+        | (N n_val) -> 
+            let new_deriv = get_new_deriv t_list rem_deriv in
+            (convert_deriv gram rem_deriv) @ (iterate_x_list t_list new_deriv gram)
+and convert_deriv gram derivation =
+    match derivation with
+    | [] -> []
+    | (x, x_list) :: t_deriv ->
+        [Node (x, (iterate_x_list x_list t_deriv gram))]
 ;;
+
 
 let make_parser gram =
-    (fun frag -> check_matcher gram frag)
+    (fun derivation -> convert_deriv gram derivation)
 ;;
-    
