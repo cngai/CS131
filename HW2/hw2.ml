@@ -72,6 +72,7 @@ let make_matcher gram =
     (fun accept frag -> matcher start_symb prod_func (prod_func start_symb) accept frag)
 ;;
 
+(* takes rem_deriv and returns back new deriv with starting point (head of) t_list *)
 let rec get_new_deriv t_list rem_deriv =
     match t_list with
     | [] -> []
@@ -84,6 +85,7 @@ let rec get_new_deriv t_list rem_deriv =
             else get_new_deriv t_list t_deriv
 ;;
 
+(* iterate through each list in derivation to get parse tree *)
 let rec iterate_x_list x_list rem_deriv gram =
     match x_list with
     | [] -> []
@@ -93,6 +95,7 @@ let rec iterate_x_list x_list rem_deriv gram =
         | (N n_val) -> 
             let new_deriv = get_new_deriv t_list rem_deriv in
             (convert_deriv gram rem_deriv) @ (iterate_x_list t_list new_deriv gram)
+(* take derivation of frag and turn into parse tree *)
 and convert_deriv gram derivation =
     match derivation with
     | [] -> []
@@ -100,7 +103,38 @@ and convert_deriv gram derivation =
         [Node (x, (iterate_x_list x_list t_deriv gram))]
 ;;
 
+let get_derivation gram accept frag =
+    let rec match_element2 rules rule accept derivation frag = match rule with
+        | [] -> accept derivation frag
+        | _ -> match frag with
+            | [] -> None
+            | curr_prefix::r_frag -> match rule with
+                | [] -> None
+                | (T term)::rhs -> if curr_prefix = term then (match_element2 rules rhs accept derivation r_frag) else None
+                | (N nterm)::rhs -> (matcher2 nterm rules (rules nterm) (match_element2 rules rhs accept) derivation frag)
+    and matcher2 start rules matching_start_rules accept derivation frag = match matching_start_rules with
+        | [] -> None
+        | top_rule::other_rules -> match (match_element2 rules top_rule accept (derivation@[start, top_rule]) frag) with
+            | None -> matcher2 start rules other_rules accept derivation frag
+            | Some res -> Some res in
+    matcher2 (fst gram) (snd gram) ((snd gram) (fst gram)) accept [] frag
+
+(* custom accceptor function that returns the derivation of the given frag *)
+let accept_all deriv string = Some (deriv, string);;
+
+(* get derivation of frag and then turn into parse tree *)
+let get_parse_tree gram frag =
+    let derivation = get_derivation gram accept_all frag in
+    match derivation with
+    | None -> None
+    | Some (deriv, s) -> 
+        let tree_list = convert_deriv gram deriv in
+        match tree_list with
+        | [] -> None
+        | h :: t ->
+            Some h
+;;
 
 let make_parser gram =
-    (fun derivation -> convert_deriv gram derivation)
+    (fun frag -> get_parse_tree gram frag)
 ;;
