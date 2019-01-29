@@ -1,51 +1,12 @@
-(*type awksub_nonterminals =
-  | Expr | Lvalue | Incrop | Binop | Num
-
-let awksub_rules =
-   [Expr, [T"("; N Expr; T")"];
-    Expr, [N Num];
-    Expr, [N Expr; N Binop; N Expr];
-    Expr, [N Lvalue];
-    Expr, [N Incrop; N Lvalue];
-    Expr, [N Lvalue; N Incrop];
-    Lvalue, [T"$"; N Expr];
-    Incrop, [T"++"];
-    Incrop, [T"--"];
-    Binop, [T"+"];
-    Binop, [T"-"];
-    Num, [T"0"];
-    Num, [T"1"];
-    Num, [T"2"];
-    Num, [T"3"];
-    Num, [T"4"];
-    Num, [T"5"];
-    Num, [T"6"];
-    Num, [T"7"];
-    Num, [T"8"];
-    Num, [T"9"]]
-
-let awksub_grammar = Expr, awksub_rules
-
-let my_convert_grammar_test0 = convert_grammar awksub_grammar
-
-let my_get_alt_list_test0 = get_alt_list awksub_rules Num 
-*)
-
-(* let my_is_leaf_test0 = is_leaf (Leaf "L3")
-let my_is_leaf_test1 = not (is_leaf (Node ("N2", [Leaf "L2"])))
-let my_is_leaf_test2 = not (is_leaf (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5])])))
-
-let my_parse_tree_leaves_test0 = parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5])]))
-let my_parse_tree_leaves_test1 = parse_tree_leaves (Leaf 3)
-let my_parse_tree_leaves_test2 = parse_tree_leaves (Node ("N1", [Leaf "L1"; (Node ("N2", [Leaf "L2"])); Leaf "L3"]))
-let my_parse_tree_leaves_test3 = parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5]); Leaf 6]))
-let my_parse_tree_leaves_test3 = parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5]); Leaf 6; Node ("-", [Leaf 7; Leaf 8])])) *)
-
 let accept_all string = Some string
 let accept_empty_suffix = function
    | _::_ -> None
    | x -> Some x
 
+(* An example grammar for a small subset of Awk.
+   This grammar is not the same as Homework 1; it is
+   instead the same as the grammar under
+   "Theoretical background" above.  *)
 
 type awksub_nonterminals =
   | Expr | Term | Lvalue | Incrop | Binop | Num
@@ -57,23 +18,22 @@ let awkish_grammar =
          [[N Term; N Binop; N Expr];
           [N Term]]
      | Term ->
-     [[N Num];
-      [N Lvalue];
-      [N Incrop; N Lvalue];
-      [N Lvalue; N Incrop];
-      [T"("; N Expr; T")"]]
+   [[N Num];
+    [N Lvalue];
+    [N Incrop; N Lvalue];
+    [N Lvalue; N Incrop];
+    [T"("; N Expr; T")"]]
      | Lvalue ->
-     [[T"$"; N Expr]]
+   [[T"$"; N Expr]]
      | Incrop ->
-     [[T"++"];
-      [T"--"]]
+   [[T"++"];
+    [T"--"]]
      | Binop ->
-     [[T"+"];
-      [T"-"]]
+   [[T"+"];
+    [T"-"]]
      | Num ->
-     [[T"0"]; [T"1"]; [T"2"]; [T"3"]; [T"4"];
-      [T"5"]; [T"6"]; [T"7"]; [T"8"]; [T"9"]])
-
+   [[T"0"]; [T"1"]; [T"2"]; [T"3"]; [T"4"];
+    [T"5"]; [T"6"]; [T"7"]; [T"8"]; [T"9"]])
 
 let test0 =
   ((make_matcher awkish_grammar accept_all ["ouch"]) = None)
@@ -100,7 +60,30 @@ let test4 =
       "++"; "+"; "0"])
   = Some [])
 
- let test5 =
+let test5 =
   (parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5])]))
    = [3; 4; 5])
 
+let small_awk_frag = ["$"; "1"; "++"; "-"; "2"]
+
+let test6 =
+  ((make_parser awkish_grammar small_awk_frag)
+   = Some (Node (Expr,
+     [Node (Term,
+      [Node (Lvalue,
+             [Leaf "$";
+        Node (Expr,
+              [Node (Term,
+               [Node (Num,
+                [Leaf "1"])])])]);
+       Node (Incrop, [Leaf "++"])]);
+      Node (Binop,
+      [Leaf "-"]);
+      Node (Expr,
+      [Node (Term,
+             [Node (Num,
+              [Leaf "2"])])])])))
+let test7 =
+  match make_parser awkish_grammar small_awk_frag with
+    | Some tree -> parse_tree_leaves tree = small_awk_frag
+    | _ -> false

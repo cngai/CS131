@@ -37,40 +37,50 @@ let parse_tree_leaves tree =
     parse_tree_list tree []
 ;;
 
-let rec matcher start_symb prod_func alt_list accept frag =
+(* iterates through each alternative list to check all arbitrary parse trees *)
+let rec iterate_alt_list start_symb prod_func alt_list accept frag =
     match alt_list with
-    | [] -> None (* could not find frag in entire prod_func *)
+    (* reached end of alt_list, you didn't match anything, return None *)
+    | [] -> None
     | h_alt_list :: rem_alt_list ->
-        let element = (match_element prod_func h_alt_list accept frag) in
-        match element with
-        | None -> matcher start_symb prod_func rem_alt_list accept frag (* keep trying to find element with rest of alt_list *)
+        (* iterate through individual list of rules *)
+        let none_or_some = (iterate_each_list h_alt_list prod_func accept frag) in
+        match none_or_some with
+        (* keep trying to find element with rest of alt_list *)
+        | None -> iterate_alt_list start_symb prod_func rem_alt_list accept frag
         | Some x -> Some x
-and match_element prod_func rhs_rules accept frag =
-    match rhs_rules with
-    | [] -> accept frag (* made it to end of rhs_rules, will return Some x *)
-    | _ -> (* somewhere in middle of rhs_rules *)
+(* iterate through each list of rules sequentially *)
+and iterate_each_list new_list prod_func accept frag =
+    match new_list with
+    (* made it to end of rhs_rules, will return Some x *)
+    | [] -> accept frag 
+    | _ ->
         match frag with
-        | [] -> None (* reached end of frag, will call matcher again with next set of rhs_rules *)
+        (* reached end of frag, no suffix, will return Some [] *)
+        | [] -> None
         | h_frag :: rem_frag ->
-            match rhs_rules with
-            | [] -> None (* made it to end of rhs_rules *)
-            | (T t_val) :: rem_rules ->
-                (* call match_element again with next rhs_rules and next frag *)
-                if h_frag = t_val then (match_element prod_func rem_rules accept rem_frag)
+            match new_list with
+            (* made it to end of new_list *)
+            | [] -> None
+            | (T t_val) :: rem_new_list ->
+                (* call iterate_each_list again with next new_list and remaining frag *)
+                if h_frag = t_val then (iterate_each_list rem_new_list prod_func accept rem_frag)
                 (* wrong path, next set of rhs_rules *)
                 else None
-            | (N nt_val) :: rem_rules ->
-                (* new acceptor made with remaining rules *)
-                let new_accept = (match_element prod_func rem_rules accept) in
-                (* call matcher but with new nt_val as start symbol *)
-                matcher nt_val prod_func (prod_func nt_val) new_accept frag
+            | (N nt_val) :: rem_new_list ->
+                (* new acceptor made with remaining list *)
+                let new_accept = (iterate_each_list rem_new_list prod_func accept) in
+                (* call iterate_alt_list but with new nt_val as start symbol *)
+                iterate_alt_list nt_val prod_func (prod_func nt_val) new_accept frag
 ;;
 
+(* return matcher for grammar gram *)
 let make_matcher gram =
     let start_symb = fst gram in
     let prod_func = snd gram in
-    (fun accept frag -> matcher start_symb prod_func (prod_func start_symb) accept frag)
+    (fun accept frag -> iterate_alt_list start_symb prod_func (prod_func start_symb) accept frag)
 ;;
+
 
 (* takes rem_deriv and returns back new deriv with starting point (head of) t_list *)
 let rec get_new_deriv t_list rem_deriv =
@@ -103,21 +113,49 @@ and convert_deriv gram derivation =
         [Node (x, (iterate_x_list x_list t_deriv gram))]
 ;;
 
-let get_derivation gram accept frag =
-    let rec match_element2 rules rule accept derivation frag = match rule with
-        | [] -> accept derivation frag
-        | _ -> match frag with
-            | [] -> None
-            | curr_prefix::r_frag -> match rule with
-                | [] -> None
-                | (T term)::rhs -> if curr_prefix = term then (match_element2 rules rhs accept derivation r_frag) else None
-                | (N nterm)::rhs -> (matcher2 nterm rules (rules nterm) (match_element2 rules rhs accept) derivation frag)
-    and matcher2 start rules matching_start_rules accept derivation frag = match matching_start_rules with
+(* iterates through each alternative list to check all arbitrary parse trees *)
+let rec iterate_alt_list_d start_symb prod_func alt_list accept derivation frag =
+    match alt_list with
+    (* reached end of alt_list, you didn't match anything, return None *)
+    | [] -> None
+    | h_alt_list :: rem_alt_list ->
+        (* iterate through individual list of rules *)
+        let none_or_some = (iterate_each_list_d h_alt_list prod_func accept (derivation@[start_symb, h_alt_list]) frag) in
+        match none_or_some with
+        (* keep trying to find element with rest of alt_list *)
+        | None -> iterate_alt_list_d start_symb prod_func rem_alt_list accept derivation frag
+        | Some x -> Some x
+(* iterate through each list of rules sequentially *)
+and iterate_each_list_d new_list prod_func accept derivation frag =
+    match new_list with
+    (* made it to end of rhs_rules, will return Some x *)
+    | [] -> accept derivation frag 
+    | _ ->
+        match frag with
+        (* reached end of frag, no suffix, will return Some [] *)
         | [] -> None
-        | top_rule::other_rules -> match (match_element2 rules top_rule accept (derivation@[start, top_rule]) frag) with
-            | None -> matcher2 start rules other_rules accept derivation frag
-            | Some res -> Some res in
-    matcher2 (fst gram) (snd gram) ((snd gram) (fst gram)) accept [] frag
+        | h_frag :: rem_frag ->
+            match new_list with
+            (* made it to end of new_list *)
+            | [] -> None
+            | (T t_val) :: rem_new_list ->
+                (* call iterate_each_list again with next new_list and remaining frag *)
+                if h_frag = t_val then (iterate_each_list_d rem_new_list prod_func accept derivation rem_frag)
+                (* wrong path, next set of rhs_rules *)
+                else None
+            | (N nt_val) :: rem_new_list ->
+                (* new acceptor made with remaining list *)
+                let new_accept = (iterate_each_list_d rem_new_list prod_func accept) in
+                (* call iterate_alt_list but with new nt_val as start symbol *)
+                iterate_alt_list_d nt_val prod_func (prod_func nt_val) new_accept derivation frag
+;;
+
+(* return matcher for grammar gram *)
+let get_derivation gram =
+    let start_symb = fst gram in
+    let prod_func = snd gram in
+    (fun accept frag -> iterate_alt_list_d start_symb prod_func (prod_func start_symb) accept [] frag)
+;;
 
 (* custom accceptor function that returns the derivation of the given frag *)
 let accept_all deriv string = Some (deriv, string);;
