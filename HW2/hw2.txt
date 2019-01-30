@@ -1,0 +1,62 @@
+I decided to write make_parser in terms of make_matcher because I initially
+call make_matcher in my make_parser function to check if make_matcher
+returns an empty suffix (i.e. Some []). If it returns an empty suffix then
+I call a function get_derivation that returns a list of the derived rules
+from the grammar. I use this derivation to build my parse tree by converting
+the list of rules into Nodes and Leaves. If make_matcher returns some sort
+of suffix (i.e. Some [...]) or if the frag cannot be found at all in the
+grammar (i.e. None), then make_parser should return None. The reason I call
+make_matcher at the very beginning of my make_parser function is because my
+make_parser function is based upon building as complete of a parse tree as
+possible, and since we want to return only complete parse trees, we want
+to make sure that there is no additional suffix in the frag that won't be
+part of the parse tree.
+
+One of the weaknesses of my make_matcher function is that it can't handle
+grammars that have indefinite depths. By indefinite depths, I mean that
+a parse tree can theoretically go on forever until it reachs its terminal
+nodes. For example, if a grammars starting symbol is Expr and one of the
+rules in the Expr alternative list is [N Term; N Lvalue; N Expr] then Expr
+can continuously keep using this rule since it ends with Expr and that
+Expr can just call that rule infinitely. When a grammar like this exists,
+my solution doesn't work and my program doesn't even compile. It gives me
+an error of overflow since my program will just recursively keep looping
+around forever. This is also a weakness of my make_parser function because
+make_parser relies on a similar iteration algorithm as make_matcher. In
+make_parser, even if there is a finite parse tree, the program will still
+not work because it recurses and iterates the grammars and will get stuck
+looping on a grammar that calls its own rule. Thus, the complete parse
+tree will never be returned.
+
+Another weakness of my make_parse function is that it takes the derivation,
+which is a list of the rules in order of how they produced the fragment, and
+calls the convert_deriv function which takes the derivation and iterates
+through it to produce a parse tree. This algorithm can be considered a
+weakness because the correctness of make_parse not only depends on getting
+the correct conversion from derivation to parse tree, but it also depends
+on getting the correct derivation when iterating through the grammar and
+fragment. If the returned derivation is incorrect, then the converted
+parse tree will subsequently be wrong as well.
+
+In terms of code reusability, my make_matcher and make_parser functions
+are not the most efficient considering that they both utilize a
+very similar recursion/iteration algorithm. However, because my make_matcher
+only returns the suffix string leftover and make_parser returns a list of
+the derivation, I put them in different functions. They each had very slight
+subtleties, but I probably could've made a function that returned a tuple
+of the derivation and the suffix and just made helper functions that extracted
+whatever part (first or second) of the tuple that I needed for that specific
+function. For example, I could have an overarching function named
+"iterate_grammar" that iterates through the grammar and returns some tuple
+named "result" that holds (derivation, [suffix]). For make_matcher, I'd be
+able to get the suffix by doing (snd result) and for make_parser, I'd be
+able to get the derivation by doing (fst result). This would allow me to
+simply reuse this code instead of putting it in two separate functions.
+
+In terms of efficiency, my make_matcher and make_parser functions are not
+efficient because they iterate through every alternative list and rules list
+in order to parse the grammar. In some cases, the function has to backtrack if
+a wrong path was taken, causing the program to be even slower since it has to
+reiterate through the grammar. This could be an issue if there is a really
+large grammar or fragment because more mistakes are likely to be made and with
+more mistakes comes more reiterations.
