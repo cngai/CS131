@@ -3,87 +3,41 @@ let accept_empty_suffix = function
    | _::_ -> None
    | x -> Some x
 
-(* An example grammar for a small subset of Awk.
-   This grammar is not the same as Homework 1; it is
-   instead the same as the grammar under
-   "Theoretical background" above.  *)
+type fr_nonterminals =
+  | One | Two | Three | Four | Five | Six
 
-type awksub_nonterminals =
-  | Expr | Term | Lvalue | Incrop | Binop | Num
+let fr_rules =
+   [One, [T"+"; N One; T"-"];
+    One, [N Five];
+    One, [N Two];
+    One, [N Three; N Two];
+    One, [N Two; N Three];
+    Two, [T"^"; N One];
+    Three, [T","];
+    Three, [T"!"];
+    Four, [T"="];
+    Four, [T"~"];
+    Five, [T"n"];
+    Five, [T")"];
+    Five, [T";"];
+    Five, [T"+"];]
 
-let awkish_grammar =
-  (Expr,
-   function
-     | Expr ->
-         [[N Term; N Binop; N Expr];
-          [N Term]]
-     | Term ->
-   [[N Num];
-    [N Lvalue];
-    [N Incrop; N Lvalue];
-    [N Lvalue; N Incrop];
-    [T"("; N Expr; T")"]]
-     | Lvalue ->
-   [[T"$"; N Expr]]
-     | Incrop ->
-   [[T"++"];
-    [T"--"]]
-     | Binop ->
-   [[T"+"];
-    [T"-"]]
-     | Num ->
-   [[T"0"]; [T"1"]; [T"2"]; [T"3"]; [T"4"];
-    [T"5"]; [T"6"]; [T"7"]; [T"8"]; [T"9"]])
+let fr_grammar = One, fr_rules
+let converted_grammar = convert_grammar fr_grammar
 
-let test0 =
-  ((make_matcher awkish_grammar accept_all ["ouch"]) = None)
+let make_matcher_test =
+	((make_matcher converted_grammar accept_all ["+"; "+"; "+"; "+"; "n"; "-"; "-"; "-"; "-"; "h"; "f"; "&"])
+	= Some ["h"; "f"; "&"])
 
-let test1 =
-  ((make_matcher awkish_grammar accept_all ["9"])
-   = Some [])
+let fr_frag = ["+"; "^"; "+"; "^"; ";"; "!"; "-"; "-"]
 
-let test2 =
-  ((make_matcher awkish_grammar accept_all ["9"; "+"; "$"; "1"; "+"])
-   = Some ["+"])
+let make_parser_test =
+	(make_parser converted_grammar fr_frag)
+	= Some (Node (One, [Leaf "+"; Node (One, [Node (Two, [Leaf "^"; Node (One,
+		[Leaf "+"; Node (One, [Node (Two, [Leaf "^"; Node (One, [Node (Five, [Leaf ";"])])]);
+			Node (Three, [Leaf "!"])]); Leaf "-"])])]); Leaf "-"]))
 
-let test3 =
-  ((make_matcher awkish_grammar accept_empty_suffix ["9"; "+"; "$"; "1"; "+"])
-   = None)
-
-(* This one might take a bit longer.... *)
-let test4 =
- ((make_matcher awkish_grammar accept_all
-     ["("; "$"; "8"; ")"; "-"; "$"; "++"; "$"; "--"; "$"; "9"; "+";
-      "("; "$"; "++"; "$"; "2"; "+"; "("; "8"; ")"; "-"; "9"; ")";
-      "-"; "("; "$"; "$"; "$"; "$"; "$"; "++"; "$"; "$"; "5"; "++";
-      "++"; "--"; ")"; "-"; "++"; "$"; "$"; "("; "$"; "8"; "++"; ")";
-      "++"; "+"; "0"])
-  = Some [])
-
-let test5 =
-  (parse_tree_leaves (Node ("+", [Leaf 3; Node ("*", [Leaf 4; Leaf 5])]))
-   = [3; 4; 5])
-
-let small_awk_frag = ["$"; "1"; "++"; "-"; "2"]
-
-let test6 =
-  ((make_parser awkish_grammar small_awk_frag)
-   = Some (Node (Expr,
-     [Node (Term,
-      [Node (Lvalue,
-             [Leaf "$";
-        Node (Expr,
-              [Node (Term,
-               [Node (Num,
-                [Leaf "1"])])])]);
-       Node (Incrop, [Leaf "++"])]);
-      Node (Binop,
-      [Leaf "-"]);
-      Node (Expr,
-      [Node (Term,
-             [Node (Num,
-              [Leaf "2"])])])])))
-let test7 =
-  match make_parser awkish_grammar small_awk_frag with
-    | Some tree -> parse_tree_leaves tree = small_awk_frag
-    | _ -> false
+let make_parser_test_inverse =
+	match make_parser converted_grammar fr_frag with
+	| Some tree -> parse_tree_leaves tree = fr_frag
+	| _ -> false
