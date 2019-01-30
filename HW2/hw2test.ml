@@ -40,11 +40,11 @@ let test0 =
 
 let test1 =
   ((make_matcher awkish_grammar accept_all ["9"])
-   = Some [])
+   = Some []
 
 let test2 =
   ((make_matcher awkish_grammar accept_all ["9"; "+"; "$"; "1"; "+"])
-   = Some ["+"])
+   = Some ["+"]
 
 let test3 =
   ((make_matcher awkish_grammar accept_empty_suffix ["9"; "+"; "$"; "1"; "+"])
