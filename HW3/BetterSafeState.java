@@ -1,0 +1,3 @@
+class BetterSafeState implements State {
+	
+}
