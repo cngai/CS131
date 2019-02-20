@@ -28,6 +28,60 @@ transpose([[H1 | T1] | T1_2], [[H1 | T2] | T2_1]) :-
 	transpose(Rem, Trans_Rem),
 	orig_to_trans(T2_1, T1, Trans_Rem).
 
+% make sure all counts are of length N
+check_lengths(counts(Top, Bottom, Left, Right), N) :-
+	length(Top, N),
+	length(Bottom, N),
+	length(Left, N),
+	length(Right, N).
+
+% returns true if H is less than Curr_Height, will subsequently increment Observed_Count
+% has to recursively iterate through entire Curr_List so only returns true if all elmnts in Curr_List < Curr_Height
+smaller_height([], _).
+smaller_height([H | T], Curr_Height) :-
+	H #< Curr_Height,	% FD constraint
+	smaller_height(T, Curr_Height).
+
+% if nothing in row, Observed_Count should be 0
+get_observed_count([], _, Observed_Count) :- Observed_Count = 0.
+get_observed_count([H_elmnt | T_elmnt], Curr_List, Observed_Count) :-
+	% check next element in row
+	append(Curr_List, [H_elmnt], Next_List),
+	get_observed_count(T_elmnt, Next_List, New_Observed_Count),
+
+	% if H of Before < H_elmnt, increment Observed_Count, else keep it same
+	(smaller_height(Curr_List, H_elmnt) -> Observed_Count is New_Observed_Count + 1 ; New_Observed_Count = Observed_Count).
+
+% takes in matrix and specified count list
+% checks to see if heights of towers match specified count in each column
+match_counts([], []).
+match_counts([H_row | T_row], [H_cnt | T_cnt]) :-
+	get_observed_count(H_row, [], Observed_Count),
+	H_cnt = Observed_Count,	% check if Observed_Count is equal to specified count
+	match_counts(T_row, T_cnt). % check rest of columns
+
+% reverses entire matrix using reverse/2 predicate
+reverse_matrix([], []).
+reverse_matrix([H_matrix | T_matrix], [H_rev | T_rev]) :-
+	reverse(H_matrix, H_rev),
+	reverse_matrix(T_matrix, T_rev).
+
+% make sure all counts of matrix are correct
+check_counts(Orig, Trans, Top, Bottom, Left, Right) :-
+	% CHECK TOP COUNT
+	match_counts(Trans, Top),
+
+	% CHECK BOTTOM COUNT
+	reverse_matrix(Trans, Rev_Trans),
+	match_counts(Rev_Trans, Bottom),
+
+	% CHECK LEFT COUNT
+	match_counts(Orig, Left),
+
+	% CHECK RIGHT ZCOUNT
+	reverse_matrix(Orig, Rev_Orig),
+	match_counts(Rev_Orig, Right).
+
 % N - nonnegative integer specifying size of grid
 % T - list of N lists, each representing row of square grid
 % C - structure w/ function symbol counts and arity 4; args are list of counts for t, b, l, r
@@ -40,9 +94,17 @@ tower(N, T, C) :-
 	maplist(fd_all_different, T), % checks to make sure all elements in rows of T are unique
 
 	% COLUMNS
-	transpose(T, Trans_T).
+	transpose(T, Trans_T), % get transpose of T
+	maplist(in_range(N), Trans_T),
+	maplist(fd_all_different, Trans_T),
+	maplist(fd_labeling, Trans_T),
 
-	%C = counts(Top, Bottom, Left, Right).
+	% COUNTS
+	C = counts(T_Ct, B_Ct, L_Ct, R_Ct), % make sure arity of 4
+	check_lengths(C, N),
+
+	% MAKE SURE COUNTS ARE CORRECT
+	check_counts(T, Trans_T, T_Ct, B_Ct, L_Ct, R_Ct).
 
 % enumerate possible integer solutions using member/2 and is/2
 % member(?Elem, ?List). ==> True if Elem is member of List
