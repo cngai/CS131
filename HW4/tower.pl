@@ -1,3 +1,5 @@
+/* TOWER */
+
 % check to see if N columns per row
 length_col([], _).	% base case
 length_col([H | T], N) :-
@@ -5,8 +7,7 @@ length_col([H | T], N) :-
 	length_col(T, N).
 
 % checks to make sure elements of List are between 1 and N
-in_range(N, List) :-
-	fd_domain(List, 1, N).
+in_range(N, List) :- fd_domain(List, 1, N).
 
 % maps first column of original matrix to first row of transposed matrix
 /* accepts tail of original matrix (N-1 x N),
@@ -97,7 +98,9 @@ tower(N, T, C) :-
 	transpose(T, Trans_T), % get transpose of T
 	maplist(in_range(N), Trans_T),
 	maplist(fd_all_different, Trans_T),
-	maplist(fd_labeling, Trans_T),
+
+	% FIND SOLUTION
+	maplist(fd_labeling, T),
 
 	% COUNTS
 	C = counts(T_Ct, B_Ct, L_Ct, R_Ct), % make sure arity of 4
@@ -106,8 +109,70 @@ tower(N, T, C) :-
 	% MAKE SURE COUNTS ARE CORRECT
 	check_counts(T, Trans_T, T_Ct, B_Ct, L_Ct, R_Ct).
 
+
+/* PLAIN TOWER */
+
+% make sure all elements of list are between Lower and Upper range
+plain_domain([], _, _).
+plain_domain([H_elmnt | T_elmnt], Lower, Upper) :-
+	H_elmnt #>= Lower,
+	H_elmnt #=< Upper,
+	plain_domain(T_elmnt, Lower, Upper).
+
+% make sure all rows/cols of matrix are in range
+plain_in_range(N, List) :- plain_domain(List, 1, N).
+
+% recursively check if Val is in remainder of list
+is_all_different(_, []).
+is_all_different(Val, [H | T]) :-
+	Val #\= H,
+	is_all_different(Val, T).
+
+% makes sure all elements in list are different
+no_repeats(_, []).
+no_repeats(Before, [H_elmnt | T_elmnt]) :-
+	is_all_different(H_elmnt, T_elmnt),
+	append(Before, [H_elmnt], After),
+	no_repeats(After, T_elmnt).
+
+% make sure all elements in rows/cols are different
+plain_different(List) :- no_repeats([], List).
+
+% find solution utilizing permutation/2, findall/3, between/3 predicates
+% permutation(?Xs, ?Ys) ==> true when Xs is permutation of Ys
+% findall(+Template, :Goal, -Bag) ==> create list of instantiations Template
+% gets on backtracking over Goal and unify result with Bag
+% between(+Low, +High, ?Value) ==> true if Value is between Low and High
+plain_labeling(N, List) :-
+	findall(Number, between(1, N, Number), Bag), % find all solutions
+	permutation(Bag, List).	% get different permutations of each row and try to find solution
+
 % enumerate possible integer solutions using member/2 and is/2
 % member(?Elem, ?List). ==> True if Elem is member of List
 % Number is +Expr. ==> True when Number is value to which Expr evaluates
 plain_tower(N, T, C) :-
-	raining.
+	length(T, N),
+	length_col(T, N),
+
+	% ROWS
+	maplist(plain_in_range(N), T),
+	maplist(plain_different, T),
+
+	% COLUMNS
+	transpose(T, Trans_T),
+	maplist(plain_in_range(N), Trans_T),
+	maplist(plain_different, Trans_T),
+
+	% FIND SOLUTION
+	maplist(plain_labeling(N), T),
+
+	% COUNTS
+	C = counts(T_Ct, B_Ct, L_Ct, R_Ct), % make sure arity of 4
+	check_lengths(C, N),
+
+	% MAKE SURE COUNTS ARE CORRECT
+	check_counts(T, Trans_T, T_Ct, B_Ct, L_Ct, R_Ct).
+
+
+
+
