@@ -67,22 +67,6 @@ reverse_matrix([H_matrix | T_matrix], [H_rev | T_rev]) :-
 	reverse(H_matrix, H_rev),
 	reverse_matrix(T_matrix, T_rev).
 
-% make sure all counts of matrix are correct
-check_counts(Orig, Trans, Top, Bottom, Left, Right) :-
-	% CHECK TOP COUNT
-	match_counts(Trans, Top),
-
-	% CHECK BOTTOM COUNT
-	reverse_matrix(Trans, Rev_Trans),
-	match_counts(Rev_Trans, Bottom),
-
-	% CHECK LEFT COUNT
-	match_counts(Orig, Left),
-
-	% CHECK RIGHT ZCOUNT
-	reverse_matrix(Orig, Rev_Orig),
-	match_counts(Rev_Orig, Right).
-
 % N - nonnegative integer specifying size of grid
 % T - list of N lists, each representing row of square grid
 % C - structure w/ function symbol counts and arity 4; args are list of counts for t, b, l, r
@@ -106,8 +90,16 @@ tower(N, T, C) :-
 	C = counts(T_Ct, B_Ct, L_Ct, R_Ct), % make sure arity of 4
 	check_lengths(C, N),
 
-	% MAKE SURE COUNTS ARE CORRECT
-	check_counts(T, Trans_T, T_Ct, B_Ct, L_Ct, R_Ct).
+	% CHECK TOP COUNT
+	match_counts(Trans_T, T_Ct),
+	% CHECK BOTTOM COUNT
+	reverse_matrix(Trans_T, Rev_Trans_T),
+	match_counts(Rev_Trans_T, B_Ct),
+	% CHECK LEFT COUNT
+	match_counts(T, L_Ct),
+	% CHECK RIGHT ZCOUNT
+	reverse_matrix(T, Rev_T),
+	match_counts(Rev_T, R_Ct).
 
 
 /* PLAIN TOWER */
@@ -124,9 +116,8 @@ plain_in_range(N, List) :- plain_domain(List, 1, N).
 
 % recursively check if Val is in remainder of list
 is_all_different(_, []).
-is_all_different(Val, [H | T]) :-
-	Val #\= H,
-	is_all_different(Val, T).
+is_all_different(Val, [H | T]) :- member(Val, [H | T]), !, fail.
+is_all_different(_, [H | T]) :- is_all_different(H, T).
 
 % makes sure all elements in list are different
 no_repeats(_, []).
@@ -170,9 +161,41 @@ plain_tower(N, T, C) :-
 	C = counts(T_Ct, B_Ct, L_Ct, R_Ct), % make sure arity of 4
 	check_lengths(C, N),
 
-	% MAKE SURE COUNTS ARE CORRECT
-	check_counts(T, Trans_T, T_Ct, B_Ct, L_Ct, R_Ct).
+	% CHECK TOP COUNT
+	match_counts(Trans_T, T_Ct),
+	% CHECK BOTTOM COUNT
+	reverse_matrix(Trans_T, Rev_Trans_T),
+	match_counts(Rev_Trans_T, B_Ct),
+	% CHECK LEFT COUNT
+	match_counts(T, L_Ct),
+	% CHECK RIGHT ZCOUNT
+	reverse_matrix(T, Rev_T),
+	match_counts(Rev_T, R_Ct).
 
 
+/* PERFORMANCE */
 
+% runs both tower/3 and plain_tower/3 and unifies ars to floating-point ratio
+% of latter's total CPU time to former
+% should be greater than 1 b/c plain_tower/3 should be slower
+speedup(FPR) :-
+	statistics(cpu_time, [_, _]),
+	tower(5, _, C),
+	statistics(cpu_time, [_, Tower_End_Time]),
+	plain_tower(5, _, C),
+	statistics(cpu_time, [_, Plain_Tower_End_Time]),
 
+	% compute cpu times
+	PT_Time is (1.0)*(Plain_Tower_End_Time+1),
+	T_Time is (1.0)*(Tower_End_Time + 1),
+	FPR is PT_Time/T_Time.
+
+/* AMBIGUOUS TOWERS PUZZLE */
+
+% uses tower/3 to find single NxN Towers puzzle with edges C and two distinct
+% solutions T1 and T2, and use it to find ambiguous puzzle
+% returns ambiguous puzzle
+ambiguous(N, C, T1, T2) :-
+	tower(N, T1, C),
+	tower(N, T2, C),
+	T1 \= T2.
