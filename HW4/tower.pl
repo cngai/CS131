@@ -104,30 +104,15 @@ tower(N, T, C) :-
 
 /* PLAIN TOWER */
 
-% make sure all elements of list are between Lower and Upper range
-plain_domain([], _, _).
-plain_domain([H_elmnt | T_elmnt], Lower, Upper) :-
-	H_elmnt #>= Lower,
-	H_elmnt #=< Upper,
-	plain_domain(T_elmnt, Lower, Upper).
-
 % make sure all rows/cols of matrix are in range
 plain_in_range(N, List) :- plain_domain(List, 1, N).
 
-% recursively check if Val is in remainder of list
-is_all_different(_, []).
-is_all_different(Val, [H | T]) :- member(Val, [H | T]), !, fail.
-is_all_different(_, [H | T]) :- is_all_different(H, T).
-
-% makes sure all elements in list are different
-no_repeats(_, []).
-no_repeats(Before, [H_elmnt | T_elmnt]) :-
-	is_all_different(H_elmnt, T_elmnt),
-	append(Before, [H_elmnt], After),
-	no_repeats(After, T_elmnt).
-
-% make sure all elements in rows/cols are different
-plain_different(List) :- no_repeats([], List).
+% make sure all elements of list are between Lower and Upper range
+plain_domain([], _, _).
+plain_domain([H_elmnt | T_elmnt], Lower, Upper) :-
+	H_elmnt >= Lower,
+	H_elmnt =< Upper,
+	plain_domain(T_elmnt, Lower, Upper).
 
 % find solution utilizing permutation/2, findall/3, between/3 predicates
 % permutation(?Xs, ?Ys) ==> true when Xs is permutation of Ys
@@ -138,12 +123,30 @@ plain_labeling(N, List) :-
 	findall(Number, between(1, N, Number), Bag), % find all solutions
 	permutation(Bag, List).	% get different permutations of each row and try to find solution
 
-% enumerate possible integer solutions using member/2 and is/2
+% make sure all elements in rows/cols are different
+plain_different(List) :- no_repeats([], List).
+
+% makes sure all elements in list are different
+no_repeats(_, []).
+no_repeats(Before, [H_elmnt | T_elmnt]) :-
+	is_all_different(H_elmnt, T_elmnt),
+	append(Before, [H_elmnt], After),
+	no_repeats(After, T_elmnt).
+
+% recursively check if Val is in remainder of list
+is_all_different(_, []).
+is_all_different(Val, [H | T]) :-
+	Val \= H,
+	is_all_different(Val, T).
+
 % member(?Elem, ?List). ==> True if Elem is member of List
 % Number is +Expr. ==> True when Number is value to which Expr evaluates
 plain_tower(N, T, C) :-
 	length(T, N),
 	length_col(T, N),
+
+	% FIND SOLUTION
+	maplist(plain_labeling(N), T),
 
 	% ROWS
 	maplist(plain_in_range(N), T),
@@ -153,10 +156,7 @@ plain_tower(N, T, C) :-
 	transpose(T, Trans_T),
 	maplist(plain_in_range(N), Trans_T),
 	maplist(plain_different, Trans_T),
-
-	% FIND SOLUTION
-	maplist(plain_labeling(N), T),
-
+	
 	% COUNTS
 	C = counts(T_Ct, B_Ct, L_Ct, R_Ct), % make sure arity of 4
 	check_lengths(C, N),
@@ -178,17 +178,43 @@ plain_tower(N, T, C) :-
 % runs both tower/3 and plain_tower/3 and unifies ars to floating-point ratio
 % of latter's total CPU time to former
 % should be greater than 1 b/c plain_tower/3 should be slower
+
+run_tower_ten_times(N) :-
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C),
+	tower(N, T, C).
+
+run_pt_ten_times(N) :-
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C),
+	plain_tower(N, T, C).
+
 speedup(FPR) :-
 	statistics(cpu_time, [_, _]),
-	tower(5, _, C),
+	run_tower_ten_times(4),
 	statistics(cpu_time, [_, Tower_End_Time]),
-	plain_tower(5, _, C),
+	T_Time is (1.0)*(Tower_End_Time),
+	run_pt_ten_times(4),
 	statistics(cpu_time, [_, Plain_Tower_End_Time]),
+	PT_Time is (1.0)*(Plain_Tower_End_Time),
 
-	% compute cpu times
-	PT_Time is (1.0)*(Plain_Tower_End_Time+1),
-	T_Time is (1.0)*(Tower_End_Time + 1),
+	% compute cpu times	
 	FPR is PT_Time/T_Time.
+
 
 /* AMBIGUOUS TOWERS PUZZLE */
 
