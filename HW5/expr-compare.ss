@@ -1,5 +1,7 @@
 #lang racket
 
+; EXPR-COMPARE
+
 ; (expr-compare '(let ((x 1) (y 2)) (+ x y)) '(let ((a 1) (b 2)) (+ a b)))
 ; (expr-compare '(let ((x 1) (y 2)) (+ x y)) '(let ((a 1)) (+ a 1)))
 ; (expr-compare '((lambda (a) (f a)) 1) '((λ (a) (g a)) 2))
@@ -47,15 +49,15 @@
 (define (get-bound-variables x y x-vals y-vals)
   ; attach bounded variables to associated value in list
   (list (compare-bound-variables (car x) (car y))
-        (expr-compare-helper (cadr x) (cadr y) x-vals y-vals)
+        (expr-compare-helper (car (cdr x)) (car (cdr y)) x-vals y-vals)
   )
 )
 
 ; binds single terms
 (define (single-bind-kv keys vals)
   (if (pair? vals)
-    (if (equal? keys (caar vals))
-        (car (cdar vals))
+    (if (equal? keys (car (car vals)))
+        (car (cdr (car vals)))
         (single-bind-kv keys (cdr vals))
     )
     keys
@@ -66,17 +68,17 @@
 (define (multiple-bind-kv keys vals)
         ; first element of keys == let
   (cond ((equal? 'let (car keys))
-          (let* ((keys-variables  (map car (cadr keys)))
-                 (keys-vals (map cadr (cadr keys)))
+          (let* ((keys-variables  (map car (car (cdr keys))))
+                 (keys-vals (map cadr (car (cdr keys))))
                  (bounded-keys-vals (map (lambda (kv) (bind-kv kv vals)) keys-vals))
-                 (keys-body (caddr keys)))
+                 (keys-body (car (cdr (cdr keys)))))
               (list 'let (map list keys-variables bounded-keys-vals) (bind-kv keys-body vals))
           )
         )
         ; first element of keys == lambda
         ((equal? 'lambda (car keys))
-          (let* ((formals (cadr keys))
-                 (body (caddr keys)))
+          (let* ((formals (car (cdr keys)))
+                 (body (car (cdr (cdr keys)))))
               (list 'lambda
                     formals
                     (bind-kv body vals)))
@@ -85,7 +87,7 @@
         ((equal? 'quote (car keys)) keys)
         ; otherwise
         (else (cons (bind-kv (car keys) vals) (bind-kv (cdr keys) vals)))
-    )
+  )
 )
 
 (define (bind-kv keys vals)
@@ -136,7 +138,7 @@
 )
 
 ; else statement
-(define (yeet x y x-vals y-vals)
+(define (create-pair x y x-vals y-vals)
   (cons (expr-compare-helper (car x) (car y) x-vals y-vals) (expr-compare-helper (cdr x) (cdr y) x-vals y-vals))
 )
 
@@ -151,20 +153,20 @@
           ((both-have-let x y)
             ; x/y-keys are local variables
             ; x/y-body are body
-            (let ((x-keys (cadr x)) (y-keys (cadr y)) (x-body (caddr x)) (y-body (caddr y)))
+            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (car (cdr (cdr x)))) (y-body (car (cdr (cdr y)))))
               ; get diff summary of let statement
               (get-diff-let x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
           ; x and y start with lambda
           ((both-have-lambda x y)
-            (let ((x-keys (cadr x)) (y-keys (cadr y)) (x-body (caddr x)) (y-body (caddr y)))
+            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (car (cdr (cdr x)))) (y-body (car (cdr (cdr y)))))
               (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
           ; otherwise
           (else
-            (yeet x y x-vals y-vals)
+            (create-pair x y x-vals y-vals)
           )
     )
     ; if last element in x and y lists
@@ -175,3 +177,24 @@
 (define (expr-compare x y)
   (expr-compare-helper x y '() '())
 )
+
+; TEST-EXPR_COMPARE
+
+; if #t then assign % as #t, otherwise assign % as #f
+(define (assign-boolean bool expr)
+  (if bool
+    (list 'let '((% #t)) expr)
+    (list 'let '((% #f)) expr)
+  )
+)
+
+; evaluate expression returned by expr-compare with % bound to #t/f
+; returns #t or #f if expressions equal each other
+(define (test-expr-compare x y)
+  (and 
+    (equal? (eval (assign-boolean #t (expr-compare x y))) (eval x))
+    (equal? (eval (assign-boolean #f (expr-compare x y))) (eval y))
+  )
+)
+
+
