@@ -2,15 +2,6 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(+ #f ((λ (a b) (f a b)) 1 2)) '(+ #t ((lambda (a c) (f a c)) 1 2)))
-; (expr-compare '((λ (a b) (f a b)) 1 2) '((λ (a c) (f c a)) 1 2))
-; (expr-compare '((lambda (a) (eq? a ((λ (a b) ((λ (a b) (a b)) b a))
-;                                    a (lambda (a) a))))
-;               (lambda (b a) (b a)))
-;              '((λ (a) (eqv? a ((lambda (b a) ((lambda (a b) (a b)) b a))
-;                                a (λ (b) a))))
-;                (lambda (a b) (a b))))
-
 ; (expr-compare '(lambda (a b) a) '(lambda (a . b) a))
 ; (expr-compare '(lambda a a) '(lambda (a) a))
 ; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a))
