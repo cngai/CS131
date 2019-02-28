@@ -2,6 +2,15 @@
 
 ; (expr-compare '(let ((x 1) (y 2)) (+ x y)) '(let ((a 1) (b 2)) (+ a b)))
 ; (expr-compare '(let ((x 1) (y 2)) (+ x y)) '(let ((a 1)) (+ a 1)))
+; (expr-compare '((lambda (a) (f a)) 1) '((λ (a) (g a)) 2))
+; (expr-compare '(+ #f ((λ (a b) (f a b)) 1 2)) '(+ #t ((lambda (a c) (f a c)) 1 2)))
+; (expr-compare '((λ (a b) (f a b)) 1 2) '((λ (a c) (f c a)) 1 2))
+; (expr-compare '((lambda (a) (eq? a ((λ (a b) ((λ (a b) (a b)) b a))
+;                                    a (lambda (a) a))))
+;               (lambda (b a) (b a)))
+;              '((λ (a) (eqv? a ((lambda (b a) ((lambda (a b) (a b)) b a))
+;                                a (λ (b) a))))
+;                (lambda (a b) (a b))))
 
 ; returns true if x and y have >1 elements and are same length
 (define (has-multiple-elements x y)
@@ -101,7 +110,7 @@
 )
 
 ; get diff summary of let statement
-(define (get-diff-let x-keys y-keys x-body y-body x-vals y-vals)
+(define (get-diff-let x y x-keys y-keys x-body y-body x-vals y-vals)
   ; if x-keys and y-keys same length, run get-bound-variables
   (if (= (length x-keys) (length y-keys))
     (let* ((bound-variables (map (lambda (x y) (get-bound-variables x y x-vals y-vals)) x-keys y-keys))
@@ -109,21 +118,26 @@
       (list 'let bound-variables diff-body)
     )
     ; otherwise compare terms using compare-diff-length
-    (compare-diff-length (bind-kv x-keys x-vals) (bind-kv y-keys y-vals))
+    (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
   )
 )
 
 ; get diff summary of lambda function
-(define (get-diff-lambda x-keys y-keys x-body y-body x-vals y-vals)
+(define (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
   ; if x-keys and y-keys are same length, run compare-bound-variables
   (if (= (length x-keys) (length y-keys))
     (let* ((bound-variables (map compare-bound-variables x-keys y-keys))
-    (diff-body (expr-compare-helper x-body y-body (append (map list (map car x-keys) (map car bound-variables)) x-vals) (append (map list (map car y-keys) (map car bound-variables)) y-vals))))
+    (diff-body (expr-compare-helper x-body y-body (append (map list x-keys bound-variables) x-vals) (append (map list y-keys bound-variables) y-vals))))
       (list 'lambda bound-variables diff-body)
     )
     ; otherwise compare terms using compare-diff-length
-    (compare-diff-length (bind-kv x-keys x-vals) (bind-kv y-keys y-vals))
+    (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
   )
+)
+
+; else statement
+(define (yeet x y x-vals y-vals)
+  (cons (expr-compare-helper (car x) (car y) x-vals y-vals) (expr-compare-helper (cdr x) (cdr y) x-vals y-vals))
 )
 
 (define (expr-compare-helper x y x-vals y-vals)
@@ -139,16 +153,19 @@
             ; x/y-body are body
             (let ((x-keys (cadr x)) (y-keys (cadr y)) (x-body (caddr x)) (y-body (caddr y)))
               ; get diff summary of let statement
-              (get-diff-let x-keys y-keys x-body y-body x-vals y-vals)
+              (get-diff-let x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
           ; x and y start with lambda
           ((both-have-lambda x y)
             (let ((x-keys (cadr x)) (y-keys (cadr y)) (x-body (caddr x)) (y-body (caddr y)))
-              (get-diff-lambda x-keys y-keys x-body y-body x-vals y-vals)
+              (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
-          (else #f) ; this is temporary
+          ; otherwise
+          (else
+            (yeet x y x-vals y-vals)
+          )
     )
     ; if last element in x and y lists
     (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
