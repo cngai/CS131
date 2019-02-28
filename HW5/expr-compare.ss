@@ -2,9 +2,6 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(let ((x 1) (y 2)) (+ x y)) '(let ((a 1) (b 2)) (+ a b)))
-; (expr-compare '(let ((x 1) (y 2)) (+ x y)) '(let ((a 1)) (+ a 1)))
-; (expr-compare '((lambda (a) (f a)) 1) '((λ (a) (g a)) 2))
 ; (expr-compare '(+ #f ((λ (a b) (f a b)) 1 2)) '(+ #t ((lambda (a c) (f a c)) 1 2)))
 ; (expr-compare '((λ (a b) (f a b)) 1 2) '((λ (a c) (f c a)) 1 2))
 ; (expr-compare '((lambda (a) (eq? a ((λ (a b) ((λ (a b) (a b)) b a))
@@ -13,6 +10,15 @@
 ;              '((λ (a) (eqv? a ((lambda (b a) ((lambda (a b) (a b)) b a))
 ;                                a (λ (b) a))))
 ;                (lambda (a b) (a b))))
+
+; (expr-compare '(lambda (a b) a) '(lambda (a . b) a))
+; (expr-compare '(lambda a a) '(lambda (a) a))
+; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a))
+; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a))
+; (expr-compare '(lambda (a b) (a b c)) '(lambda (a b) a))
+
+; definition of lambda symbol
+(define lambda-symbol (string->symbol "\u03BB"))
 
 ; returns true if x and y have >1 elements and are same length
 (define (has-multiple-elements x y)
@@ -32,7 +38,11 @@
 
 ; returns true if x and y both start with 'lambda'
 (define (both-have-lambda x y)
-  (if (and (equal? 'lambda (car x)) (equal? 'lambda (car y))) #t #f)
+  (if (and (or (equal? 'lambda (car x)) (equal? lambda-symbol (car x)))
+           (or (equal? 'lambda (car y)) (equal? lambda-symbol (car y))))
+    #t
+    #f
+  )
 )
 
 ; returns either same variable y or bounded variable x ! y
@@ -129,8 +139,9 @@
   ; if x-keys and y-keys are same length, run compare-bound-variables
   (if (= (length x-keys) (length y-keys))
     (let* ((bound-variables (map compare-bound-variables x-keys y-keys))
-    (diff-body (expr-compare-helper x-body y-body (append (map list x-keys bound-variables) x-vals) (append (map list y-keys bound-variables) y-vals))))
-      (list 'lambda bound-variables diff-body)
+    (diff-body (expr-compare-helper x-body y-body (append (map list x-keys bound-variables) x-vals) (append (map list y-keys bound-variables) y-vals)))
+    (lambda-or-symbol (if (and (equal? 'lambda (car x)) (equal? 'lambda (car y))) 'lambda lambda-symbol)))
+      (list lambda-or-symbol bound-variables diff-body)
     )
     ; otherwise compare terms using compare-diff-length
     (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
@@ -145,9 +156,11 @@
 (define (expr-compare-helper x y x-vals y-vals)
   ; check if more than one element in x and y lists
   (if (has-multiple-elements x y)
-          ; either x or y starts with quote
-    (cond ((one-has-quote x y)
-            (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
+          ; x and y start with lambda
+    (cond ((both-have-lambda x y)
+            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (car (cdr (cdr x)))) (y-body (car (cdr (cdr y)))))
+              (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
+            )
           )
           ; x and y start with let 
           ((both-have-let x y)
@@ -157,12 +170,10 @@
               ; get diff summary of let statement
               (get-diff-let x y x-keys y-keys x-body y-body x-vals y-vals)
             )
-          )
-          ; x and y start with lambda
-          ((both-have-lambda x y)
-            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (car (cdr (cdr x)))) (y-body (car (cdr (cdr y)))))
-              (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
-            )
+          )         
+          ; either x or y starts with quote
+          ((one-has-quote x y)
+            (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
           )
           ; otherwise
           (else
@@ -196,5 +207,18 @@
     (equal? (eval (assign-boolean #f (expr-compare x y))) (eval y))
   )
 )
+
+; TEST-EXPR-X/Y
+
+; variables usd to test expr-compare well by exercising all specifications
+;(define (test-expr-x)
+
+;)
+
+;(define (test-expr-y)
+
+;)
+
+
 
 
