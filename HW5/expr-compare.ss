@@ -2,8 +2,6 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(lambda (a b) a) '(lambda (a . b) a))
-; (expr-compare '(lambda a a) '(lambda (a) a))
 ; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a))
 ; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a))
 ; (expr-compare '(lambda (a b) (a b c)) '(lambda (a b) a))
@@ -160,7 +158,7 @@
   (if (has-multiple-elements x y)
           ; x and y start with lambda
     (cond ((both-have-lambda x y)
-            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (car (cdr (cdr x)))) (y-body (car (cdr (cdr y)))))
+            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (cdr (cdr x))) (y-body (cdr (cdr y))))
               (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
