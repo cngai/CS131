@@ -127,18 +127,25 @@
 
 ; get diff summary of lambda function
 (define (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
-  (let ((new-x-keys (if (list? x-keys) x-keys (list (car x-keys) '\. (cdr x-keys))))
-        (new-y-keys (if (list? y-keys) y-keys (list (car y-keys) '\. (cdr y-keys))))
-       )
-    ; if x-keys and y-keys are same length, run compare-bound-variables
-    (if (= (length new-x-keys) (length new-y-keys))
-      (let* ((bound-variables (map compare-bound-variables new-x-keys new-y-keys))
-      (diff-body (expr-compare-helper x-body y-body (append (map list new-x-keys bound-variables) x-vals) (append (map list new-y-keys bound-variables) y-vals)))
-      (lambda-or-symbol (if (and (equal? 'lambda (car x)) (equal? 'lambda (car y))) 'lambda lambda-symbol)))
-        (list lambda-or-symbol bound-variables diff-body)
+  ; check to see if arg has parenthesis or not
+  (if (or (not(pair? x-keys)) (not(pair? y-keys)))
+    ; if no parenthesis, just bind them
+    (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
+
+    ; otherwise compare arguments in parenthesis
+    (let ((new-x-keys (if (list? x-keys) x-keys (list (car x-keys) '\. (cdr x-keys))))
+          (new-y-keys (if (list? y-keys) y-keys (list (car y-keys) '\. (cdr y-keys))))
+         )
+      ; if x-keys and y-keys are same length, run compare-bound-variables
+      (if (= (length new-x-keys) (length new-y-keys))
+        (let* ((bound-variables (map compare-bound-variables new-x-keys new-y-keys))
+        (diff-body (expr-compare-helper x-body y-body (append (map list new-x-keys bound-variables) x-vals) (append (map list new-y-keys bound-variables) y-vals)))
+        (lambda-or-symbol (if (and (equal? 'lambda (car x)) (equal? 'lambda (car y))) 'lambda lambda-symbol)))
+          (list lambda-or-symbol bound-variables diff-body)
+        )
+        ; otherwise compare terms using compare-diff-length
+        (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
       )
-      ; otherwise compare terms using compare-diff-length
-      (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
     )
   )
 )
