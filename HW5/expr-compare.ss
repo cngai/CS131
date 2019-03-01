@@ -2,9 +2,8 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a)) --> too many parenthesis
+; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a)) --> too many but i think it looks right tbh
 ; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a)) --> too many parenthesis around (a b c)
-; (expr-compare '(lambda (a b) (a b c)) '(lambda (a b) a)) --> too many parenthesis around (if ...)
 
 ; definition of lambda symbol
 (define lambda-symbol (string->symbol "\u03BB"))
@@ -160,8 +159,10 @@
           ; x and y start with lambda
     (cond ((both-have-lambda x y)
             (let* ((x-keys (car (cdr x))) (y-keys (car (cdr y)))
-                 (x-body (cdr (cdr x)))
-                 (y-body (cdr (cdr y))))
+                   (length-x-body (length (cdr (cdr x))))
+                   (length-y-body (length (cdr (cdr y))))
+                   (x-body (if (= length-x-body 1) (car (cdr (cdr x))) (cdr (cdr x))))
+                   (y-body (if (= length-y-body 1) (car (cdr (cdr y))) (cdr (cdr y)))))
                     (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
