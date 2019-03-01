@@ -215,13 +215,37 @@
 ; TEST-EXPR-X/Y
 
 ; variables usd to test expr-compare well by exercising all specifications
-;(define (test-expr-x)
+(define test-expr-x
+  '(list 'a (cons
+    '(let ((x 1))
+      (* x 3)
+    )
+    (quote (lambda (b)
+      (let ((c (+ 3 2) (d (- 7 5)))
+        (if (and (> c d) (< b c))
+          #t
+          #f
+        )
+      )))
+    )
+  ))
+)
 
-;)
-
-;(define (test-expr-y)
-
-;)
+(define test-expr-y
+  '(list 'b (cons
+    '(let ((y 1))
+      (* y 2)
+    )
+    (quote (lambda (w)
+      (let ((r (- 1 5) (d (+ 2 3)))
+        (if (and (> r d) (< w r))
+          #f
+          #t
+        )
+      )))
+    )
+  ))
+)
 
 
 
