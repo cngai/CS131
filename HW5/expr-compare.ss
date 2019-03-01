@@ -2,7 +2,7 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a)) --> too many but i think it looks right tbh
+; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a)) --> too many parenthesis
 ; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a)) --> too many parenthesis around (a b c)
 
 ; definition of lambda symbol
@@ -33,7 +33,7 @@
   )
 )
 
-; returns either same variable y or bounded variable x ! y
+; returns either same variable y or bounded variable x!y
 (define (compare-bound-variables x y)
   ; if variable names are same, return either x or y
   (if (equal? x y)
@@ -46,20 +46,7 @@
 ; returns list of (bounded) variables attached to associated value (i.e. (x!y 1))
 (define (get-bound-variables x y x-vals y-vals)
   ; attach bounded variables to associated value in list
-  (list (compare-bound-variables (car x) (car y))
-        (expr-compare-helper (car (cdr x)) (car (cdr y)) x-vals y-vals)
-  )
-)
-
-; binds single terms
-(define (single-bind-kv keys vals)
-  (if (pair? vals)
-    (if (equal? keys (car (car vals)))
-        (car (cdr (car vals)))
-        (single-bind-kv keys (cdr vals))
-    )
-    keys
-  )
+  (list (compare-bound-variables (car x) (car y)) (expr-compare-helper (car (cdr x)) (car (cdr y)) x-vals y-vals))
 )
 
 ; binds multiple terms
@@ -78,9 +65,8 @@
           (let* ((formals (car (cdr keys)))
                  (length-body (length (cdr (cdr keys))))
                  (body (if (= length-body 1) (car (cdr (cdr keys))) (cdr (cdr keys)))))
-              (list 'lambda
-                    formals
-                    (bind-kv body vals)))
+                    (list 'lambda formals (bind-kv body vals))
+          )
         )
         ; first element of keys == quote
         ((equal? 'quote (car keys)) keys)
@@ -89,6 +75,18 @@
   )
 )
 
+; binds single terms
+(define (single-bind-kv keys vals)
+  (if (pair? vals)
+    (if (equal? keys (car (car vals)))
+      (car (cdr (car vals)))
+      (single-bind-kv keys (cdr vals))
+    )
+    keys
+  )
+)
+
+; bind key and vals
 (define (bind-kv keys vals)
   (if (pair? keys)
     ; if more than one element in keys
@@ -110,19 +108,6 @@
   )
 )
 
-; get diff summary of let statement
-(define (get-diff-let x y x-keys y-keys x-body y-body x-vals y-vals)
-  ; if x-keys and y-keys same length, run get-bound-variables
-  (if (= (length x-keys) (length y-keys))
-    (let* ((bound-variables (map (lambda (x y) (get-bound-variables x y x-vals y-vals)) x-keys y-keys))
-      (diff-body (expr-compare-helper x-body y-body (append (map list (map car x-keys) (map car bound-variables)) x-vals) (append (map list (map car y-keys) (map car bound-variables)) y-vals))))
-      (list 'let bound-variables diff-body)
-    )
-    ; otherwise compare terms using compare-diff-length
-    (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
-  )
-)
-
 ; get diff summary of lambda function
 (define (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
   ; check to see if arg has parenthesis or not
@@ -134,7 +119,7 @@
     (let ((new-x-keys (if (list? x-keys) x-keys (list (car x-keys) '\. (cdr x-keys))))
           (new-y-keys (if (list? y-keys) y-keys (list (car y-keys) '\. (cdr y-keys))))
          )
-      ; if x-keys and y-keys are same length, run compare-bound-variables
+      ; if x-keys and y-keys are same length, run compare-bound-variables to get bound-variables
       (if (= (length new-x-keys) (length new-y-keys))
         (let* ((bound-variables (map compare-bound-variables new-x-keys new-y-keys))
         (diff-body (expr-compare-helper x-body y-body (append (map list new-x-keys bound-variables) x-vals) (append (map list new-y-keys bound-variables) y-vals)))
@@ -148,11 +133,25 @@
   )
 )
 
+; get diff summary of let statement
+(define (get-diff-let x y x-keys y-keys x-body y-body x-vals y-vals)
+  ; if x-keys and y-keys same length, run get-bound-variables
+  (if (= (length x-keys) (length y-keys))
+    (let* ((bound-variables (map (lambda (x y) (get-bound-variables x y x-vals y-vals)) x-keys y-keys))
+      (diff-body (expr-compare-helper x-body y-body (append (map list (map car x-keys) (map car bound-variables)) x-vals) (append (map list (map car y-keys) (map car bound-variables)) y-vals))))
+        (list 'let bound-variables diff-body)
+    )
+    ; otherwise compare terms using compare-diff-length
+    (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
+  )
+)
+
 ; else statement
 (define (create-pair x y x-vals y-vals)
   (cons (expr-compare-helper (car x) (car y) x-vals y-vals) (expr-compare-helper (cdr x) (cdr y) x-vals y-vals))
 )
 
+; helper function for expr-compare
 (define (expr-compare-helper x y x-vals y-vals)
   ; check if more than one element in x and y lists
   (if (multiple-elements-same-length x y)
@@ -163,7 +162,7 @@
                    (length-y-body (length (cdr (cdr y))))
                    (x-body (if (= length-x-body 1) (car (cdr (cdr x))) (cdr (cdr x))))
                    (y-body (if (= length-y-body 1) (car (cdr (cdr y))) (cdr (cdr y)))))
-                    (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
+                      (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
           ; x and y start with let 
@@ -189,6 +188,7 @@
   )
 )
 
+; compare scheme expressions and produce diff summary
 (define (expr-compare x y)
   (expr-compare-helper x y '() '())
 )
@@ -214,7 +214,7 @@
 
 ; TEST-EXPR-X/Y
 
-; variables usd to test expr-compare well by exercising all specifications
+; variables used to test expr-compare well by exercising all specifications
 (define test-expr-x
   '(list 'a (cons
     '(let ((x 1))
