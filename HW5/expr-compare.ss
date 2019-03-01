@@ -2,15 +2,15 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a))
-; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a))
+; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a)) --> too many parenthesis
+; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a)) --> too many parenthesis around (a b c)
 ; (expr-compare '(lambda (a b) (a b c)) '(lambda (a b) a))
 
 ; definition of lambda symbol
 (define lambda-symbol (string->symbol "\u03BB"))
 
 ; returns true if x and y have >1 elements and are same length
-(define (has-multiple-elements x y)
+(define (multiple-elements-same-length x y)
   (if (and (pair? x) (= (length x) (length y))) #t #f)
 )
 
@@ -77,7 +77,8 @@
         ; first element of keys == lambda
         ((equal? 'lambda (car keys))
           (let* ((formals (car (cdr keys)))
-                 (body (car (cdr (cdr keys)))))
+                 (length-body (length (cdr (cdr keys))))
+                 (body (if (= length-body 1) (car (cdr (cdr keys))) (cdr (cdr keys)))))
               (list 'lambda
                     formals
                     (bind-kv body vals)))
@@ -155,11 +156,15 @@
 
 (define (expr-compare-helper x y x-vals y-vals)
   ; check if more than one element in x and y lists
-  (if (has-multiple-elements x y)
+  (if (multiple-elements-same-length x y)
           ; x and y start with lambda
     (cond ((both-have-lambda x y)
-            (let ((x-keys (car (cdr x))) (y-keys (car (cdr y))) (x-body (cdr (cdr x))) (y-body (cdr (cdr y))))
-              (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
+            (let* ((x-keys (car (cdr x))) (y-keys (car (cdr y)))
+                 (length-x-body (length (cdr (cdr x))))
+                 (length-y-body (length (cdr (cdr y))))
+                 (x-body (if (= length-x-body 1) (car (cdr (cdr x))) (cdr (cdr x))))
+                 (y-body (if (= length-y-body 1) (car (cdr (cdr y))) (cdr (cdr y)))))
+                    (get-diff-lambda x y x-keys y-keys x-body y-body x-vals y-vals)
             )
           )
           ; x and y start with let 
@@ -180,7 +185,7 @@
             (create-pair x y x-vals y-vals)
           )
     )
-    ; if last element in x and y lists
+    ; if last element in x and y lists or x and y have different lengths
     (compare-diff-length (bind-kv x x-vals) (bind-kv y y-vals))
   )
 )
