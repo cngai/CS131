@@ -2,8 +2,7 @@
 
 ; EXPR-COMPARE
 
-; (expr-compare '(lambda (a b) a b c) '(lambda (a b) c b a)) --> too many parenthesis
-; (expr-compare '(lambda (a b) a b c) '(lambda (a b) a)) --> too many parenthesis around (a b c)
+; (expr-compare '(lambda a a) '(lambda b b))
 
 ; definition of lambda symbol
 (define lambda-symbol (string->symbol "\u03BB"))
