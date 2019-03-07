@@ -19,15 +19,15 @@ servers_dict = {
 clients_dict = {}
 
 # global variables
-serv_name = ""
-log_file = ""
-event_loop = ""
+# serv_name = ""
+#log_file = ""
+# event_loop = ""
 async_tasks = {}	# dictionary to hold async tasks
 address = "127.0.0.1"
 key = 'AIzaSyD_K5I-vj1KmbmfguQ1fM4-t7us048XaaQ'	# API key for Google API
 
 # log input and output into file
-async def log_io(message):
+def log_io(message):
 	if message == None:
 		return
 	else:
@@ -44,15 +44,20 @@ async def send_response(w, response_message):
 
 # flooding algorithm - propagate location updates to other servers
 async def flood_to_servers(cli_id, at_response):
+	print("Flooding to other servers")
 	# get client name
 	cli = clients_dict[cli_id]
 
 	# send to all the connections of the server
 	curr_server = cli['serv_name']
 	for other_server in servers_dict[curr_server]['comm_patt']:
-		# establish network connection
-		r, w = await asyncio.open_connection(address, servers_dict[other_server]['port'], loop=event_loop)
-		await send_response(w, at_response)
+		try:
+			# establish network connection
+			r, w = await asyncio.open_connection(address, servers_dict[other_server]['port'], loop=event_loop)
+			await send_response(w, at_response)
+		except:
+			print('ERROR: unable to propogate message to %s' % (other_server))
+			await log_io('ERROR: unable to propogate message to %s' % (other_server))
 
 # convert latitude/longitude in ISO 6709 notation into tuple of (lat, long)
 def convert_lat_long(lat_long):
@@ -79,12 +84,14 @@ def convert_lat_long(lat_long):
 
 
 # handle IAMAT commands
-async def handle_iamat(cli_id, lat_long, cli_time, start_time, serv_name):
+async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
+	print("Handling IAMAT")
 	# get latitude and longitude from ISO 6709 notation
 	latitude, longitude = convert_lat_long(lat_long)
 
 	# make sure we have most updated cli_id data
-	if cli_id in clients:
+	if cli_id in clients_dict:
+		print ("yeet")
 		if clients_dict[cli_id]['cli_time'] > cli_time:
 			return None
 
@@ -92,7 +99,7 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, serv_name):
 	curr_cli = {
 		'latitude': latitude,
 		'longitude': longitude,
-		'time_difference': cli_time - start_time,
+		'time_difference': float(cli_time) - start_time,
 		'cli_time': cli_time,
 		'serv_name': serv_name
 	}
@@ -101,9 +108,9 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, serv_name):
 	clients_dict[cli_id] = curr_cli
 
 	# send back response message and flood other servrers
-	at_response = "AT %s %s %s %s %s" % (serv_name, str(cli_time - start_time), cli_id, lat_long, start_time)
+	at_response = "AT %s %s %s %s %s" % (serv_name, str(float(cli_time) - start_time), cli_id, lat_long, start_time)
 	await flood_to_servers(cli_id, at_response)
-	await send_response(serv_name, at_response)
+	await send_response(w, at_response)
 	await log_io('AT response to IAMAT:\n' + at_response + '\n')
 
 # handle AT commands
@@ -124,11 +131,11 @@ async def make_ns_request(session, curr_cli, radius, num_results):
 
 
 # handle WHATSAT commands
-async def handle_whatsat(cli_id, radius, upper_bound, start_time, serv_name):
+async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	# check if valid client
 	if cli_id not in clients:
 		await log_io('WHATSAT command sent by invalid client\n')
-		await send_response(serv_name, 'WHATSAT command sent by invalid client\n')
+		await send_response(w, 'WHATSAT command sent by invalid client\n')
 
 	# get current client from dict
 	curr_cli = clients_dict[cli_id]
@@ -142,11 +149,13 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, serv_name):
 		# send response message back
 		at_response = "AT %s %s %s %s %s %s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, places_string)
 		await log_io('AT response to WHATSAT:\n' + at_response + '\n')
-		await send_response(serv_name, at_response)
+		await send_response(w, at_response)
 
 
 # handle all types of requests
-async def handle_commands(line_list, req, serv_name):
+async def handle_commands(line_list, req, w):
+	#print ("handle_commands function")
+
 	# get time in seconds since epoch
 	start_time = time.time()
 
@@ -154,13 +163,14 @@ async def handle_commands(line_list, req, serv_name):
 	command = line_list[0]
 
 	# check if valid command
-	if command != "IAMAT" or command != "AT" or command != "WHATSAT":
-		print("ERROR: invalid command")
+	if command != "IAMAT" and command != "AT" and command != "WHATSAT":
+		print("ERROR: invalid command of '%s'. Now exiting." % (command))
 		exit(1)
 
 	# IAMAT
 	if command == "IAMAT":
-		handle_iamat(line_list[1], line_list[2], line_list[3], start_time, serv_name)
+		print("Received AN IAMAT command.")
+		await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
 
 	# AT
 	# if command == "AT":
@@ -168,7 +178,7 @@ async def handle_commands(line_list, req, serv_name):
 
 	# WHATSAT
 	if command == "WHATSAT":
-		handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, serv_name)
+		await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
 
 
 # main function
@@ -186,12 +196,16 @@ async def handle_reader(r, w):
 
 # accept client and create asyncio task
 def handle_queries(r, w):
+	# for debugging
+	print("Connected")
+
 	t = asyncio.create_task(handle_reader(r, w)) # if that doesn't work try asyncio.ensure_future(obj)
 	async_tasks[t] = (r, w) # put task in dictionary
 
 	# close client when finished
-	def close_task():
-		del async_tasks[task]
+
+	def close_task(t):
+		del async_tasks[t]
 		w.close()	# close writer
 
 	# close client when task finished running
@@ -204,17 +218,20 @@ def main():
 		exit(1)
 
 	# ensure valid server name
+	global serv_name
 	serv_name = sys.argv[1]
 	if serv_name not in servers_dict:
 		print("ERROR: invalid server name")
 		exit(1)
 
 	# create log file
+	global log_file
 	log = serv_name + "-logfile.txt"
 	open(log, "w").close()
 	log_file = open(log, "a") # append to log
 
 	# get current event loop
+	global event_loop
 	event_loop = asyncio.get_event_loop()
 
 	# accept TCP connections from clients and create server
@@ -223,6 +240,10 @@ def main():
 
 	# run event loop to process events and handle client requests
 	server = event_loop.run_until_complete(serv_coro)
+
+	print('Starting server on %s via port %d' % (address, port_num))
+
+	event_loop.run_forever()
 
 	# close server and event loop when finished
 	server.close()
