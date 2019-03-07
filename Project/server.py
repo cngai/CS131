@@ -53,11 +53,13 @@ async def flood_to_servers(cli_id, at_response):
 	for other_server in servers_dict[curr_server]['comm_patt']:
 		try:
 			# establish network connection
+			#print("Unable to open connection to %s with address %s and port %d" % (other_server, address, servers_dict[other_server]['port']))
 			r, w = await asyncio.open_connection(address, servers_dict[other_server]['port'], loop=event_loop)
 			await send_response(w, at_response)
+			print('Successfully opened connection to %s' % (other_server))
 		except:
 			print('ERROR: unable to propogate message to %s' % (other_server))
-			await log_io('ERROR: unable to propogate message to %s' % (other_server))
+			await log_io('ERROR: unable to propogate message to %s\n' % (other_server))
 
 # convert latitude/longitude in ISO 6709 notation into tuple of (lat, long)
 def convert_lat_long(lat_long):
