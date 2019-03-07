@@ -27,7 +27,7 @@ address = "127.0.0.1"
 key = 'AIzaSyD_K5I-vj1KmbmfguQ1fM4-t7us048XaaQ'	# API key for Google API
 
 # log input and output into file
-def log_io(message):
+async def log_io(message):
 	if message == None:
 		return
 	else:
@@ -39,7 +39,7 @@ async def send_response(w, response_message):
 
 	# write data to writer stream
 	w.write(encoded_message)
-	await writer.drain()	# wait until appropriate to resume writing to stream
+	await w.drain()	# wait until appropriate to resume writing to stream
 	w.write_eof()	# close write end of stream
 
 # flooding algorithm - propagate location updates to other servers
