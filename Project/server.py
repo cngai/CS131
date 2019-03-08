@@ -91,7 +91,7 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 
 	# make sure we have most updated cli_id data
 	if cli_id in clients_dict:
-		if clients_dict[cli_id]['cli_time'] > cli_time:
+		if float(clients_dict[cli_id]['cli_time']) > float(cli_time):
 			return None
 
 	# define curr_cli object
@@ -148,7 +148,30 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 		await send_response(w, at_response)
 
 # handle AT commands - propagate AT response to other servers
-# def handle_at()
+async def handle_at(cli_id, lat_long, cli_time, start_time, at_response):
+	# check if already flooded
+	if cli_id in clients_dict:
+		if float(clients_dict[cli_id]['cli_time']) == float(cli_time):
+			await log_io('Already flooded %s server. Stopping propagation.\n\n' % (serv_name))
+			return
+
+	latitude, longitude = convert_lat_long(lat_long)
+
+	# define curr_cli object
+	curr_cli = {
+		'latitude': latitude,
+		'longitude': longitude,
+		'time_difference': float(cli_time) - start_time,
+		'cli_time': cli_time,
+		'serv_name': serv_name
+	}
+
+	# add curr_cli to clients_dict
+	clients_dict[cli_id] = curr_cli
+
+	await flood_to_servers(cli_id, at_response)
+	await log_io("Receiving propagated AT:\n%s\n\n" % (at_response))
+	await send_response(w, at_response)
 
 
 # handle all types of requests
@@ -190,9 +213,7 @@ async def handle_commands(line_list, w):
 				at_response += " "
 
 		at_response.lstrip().rstrip() # remove space at beginning and end
-		await log_io("Receiving propagated AT:\n%s\n\n" % (at_response))
-		await send_response(w, at_response)
-		#await handle_at(at_response)
+		await handle_at(line_list[3], line_list[4], line_list[5], start_time, at_response)
 
 # main function
 
