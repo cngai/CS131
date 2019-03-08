@@ -121,7 +121,8 @@ async def make_ns_request(session, curr_cli, radius, num_results):
 	async with session.get(request_url) as response:
 		ns_results = await response.json()
 		# get first num_results entries in ns_results
-		return ns_results["results"][:num_results]
+		ns_results["results"] = ns_results["results"][:num_results]
+		return ns_results
 
 
 # handle WHATSAT commands
