@@ -11,7 +11,7 @@ import json # for JSONs
 # create nested dict of servers to port numbers and commumication patterns
 servers_dict = {
 	'Goloman': { 'port': 11790, 'comm_patt': ['Hands', 'Holiday', 'Wilkes'] },
-	'Hands': { 'port': 11791, 'comm_patt': ['Goloman, Wilkes'] },
+	'Hands': { 'port': 11791, 'comm_patt': ['Goloman', 'Wilkes'] },
 	'Holiday': { 'port': 11792, 'comm_patt': ['Goloman', 'Welsh', 'Wilkes'] },
 	'Welsh': { 'port': 11793, 'comm_patt': ['Holiday'] },
 	'Wilkes': { 'port': 11794, 'comm_patt': ['Goloman', 'Hands', 'Holiday'] }
@@ -51,14 +51,13 @@ async def flood_to_servers(cli_id, at_response):
 	for other_server in servers_dict[curr_server]['comm_patt']:
 		try:
 			# establish network connection
-			#print("Unable to open connection to %s with address %s and port %d" % (other_server, address, servers_dict[other_server]['port']))
 			r, w = await asyncio.open_connection(address, servers_dict[other_server]['port'], loop=event_loop)
 			await send_response(w, at_response)
 			await log_io("Flooding AT message to %s:\n%s\n\n" % (other_server, at_response))
 			print('Flooding AT message to %s:\n%s\n' % (other_server, at_response))
 		except:
-			print('ERROR: unable to propogate message to %s' % (other_server))
-			await log_io('ERROR: unable to propogate message to %s\n' % (other_server))
+			print('ERROR: unable to propagate message to %s' % (other_server))
+			await log_io('ERROR: unable to propagate message to %s\n\n' % (other_server))
 
 
 # convert latitude/longitude in ISO 6709 notation into tuple of (lat, long)
@@ -111,7 +110,7 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 	at_response = "AT %s %s %s %s %s" % (serv_name, str(float(cli_time) - start_time), cli_id, lat_long, start_time)
 	await flood_to_servers(cli_id, at_response)
 	await send_response(w, at_response)
-	await log_io('AT response to IAMAT:\n' + at_response + '\n')
+	await log_io('AT response to IAMAT:\n' + at_response + '\n\n')
 
 
 # make Nearby Search request
@@ -131,7 +130,7 @@ async def make_ns_request(session, curr_cli, radius, num_results):
 async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	# check if valid client
 	if cli_id not in clients_dict:
-		await log_io('? WHATSAT\n')
+		await log_io('? WHATSAT\n\n')
 		await send_response(w, '? WHATSAT')
 		return # break out of function
 
@@ -147,6 +146,9 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 		at_response = "AT %s %s %s %s %s %s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, places_string)
 		await log_io('AT response to WHATSAT:\n' + at_response + '\n')
 		await send_response(w, at_response)
+
+# handle AT commands - propagate AT response to other servers
+# def handle_at()
 
 
 # handle all types of requests
@@ -171,10 +173,12 @@ async def handle_commands(line_list, w):
 
 	# IAMAT - client sent IAMAT command
 	if command == "IAMAT":
+		await log_io("Received IAMAT from client\n\n")
 		await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
 
 	# WHATSAT - client sent WHATSAT command
 	if command == "WHATSAT":
+		await log_io("Received WHATSAT from client\n\n")
 		await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
 
 	# AT - server propagates at message to other servers
@@ -182,10 +186,13 @@ async def handle_commands(line_list, w):
 		at_response = ""
 		for word in line_list:
 			at_response += word
-			at_response += " "
+			if word != line_list[5]:	# don't add space if last word
+				at_response += " "
 
-		await log_io("Receiving propagated AT:\n %s\n\n" % (at_response))
+		at_response.lstrip().rstrip() # remove space at beginning and end
+		await log_io("Receiving propagated AT:\n%s\n\n" % (at_response))
 		await send_response(w, at_response)
+		#await handle_at(at_response)
 
 # main function
 
@@ -199,9 +206,10 @@ async def handle_reader(r, w):
 		await handle_commands(line_list, w)
 
 # accept client and create asyncio task
-def handle_queries(r, w):
+async def handle_queries(r, w):
 	# for debugging
-	print("Connected")
+	print("New connection to %s server\n" % (serv_name))
+	await log_io("New connection to %s server\n\n" % (serv_name))
 
 	t = asyncio.create_task(handle_reader(r, w)) # if that doesn't work try asyncio.ensure_future(obj)
 	async_tasks[t] = (r, w) # put task in dictionary
