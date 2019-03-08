@@ -148,7 +148,7 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 		await send_response(w, at_response)
 
 # handle AT commands - propagate AT response to other servers
-async def handle_at(cli_id, lat_long, cli_time, start_time, at_response):
+async def handle_at(cli_id, lat_long, cli_time, start_time, w, at_response):
 	# check if already flooded
 	if cli_id in clients_dict:
 		if float(clients_dict[cli_id]['cli_time']) == float(cli_time):
@@ -213,7 +213,7 @@ async def handle_commands(line_list, w):
 				at_response += " "
 
 		at_response.lstrip().rstrip() # remove space at beginning and end
-		await handle_at(line_list[3], line_list[4], line_list[5], start_time, at_response)
+		await handle_at(line_list[3], line_list[4], line_list[5], start_time, w, at_response)
 
 # main function
 
