@@ -1,4 +1,4 @@
-import sys
+import sys # for main function
 import asyncio # for concurrent code async/await syntax
 import time # for POSIX time accesss and conversions
 import aiohttp # for async HTTP client/server
@@ -22,12 +22,14 @@ async_tasks = {}	# dictionary to hold async tasks
 address = "127.0.0.1"
 key = 'AIzaSyD_K5I-vj1KmbmfguQ1fM4-t7us048XaaQ'	# API key for Google API
 
+
 # log input and output into file
 async def log_io(message):
 	if message == None:
 		return
 	else:
 		log_file.write(message)
+
 
 # send response back to writer
 async def send_response(w, response_message):
@@ -38,9 +40,9 @@ async def send_response(w, response_message):
 	await w.drain()	# wait until appropriate to resume writing to stream
 	w.write_eof()	# close write end of stream
 
+
 # flooding algorithm - propagate location updates to other servers
 async def flood_to_servers(cli_id, at_response):
-	print("Flooding to other servers")
 	# get client name
 	cli = clients_dict[cli_id]
 
@@ -57,6 +59,7 @@ async def flood_to_servers(cli_id, at_response):
 		except:
 			print('ERROR: unable to propogate message to %s' % (other_server))
 			await log_io('ERROR: unable to propogate message to %s\n' % (other_server))
+
 
 # convert latitude/longitude in ISO 6709 notation into tuple of (lat, long)
 def convert_lat_long(lat_long):
@@ -89,7 +92,6 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 
 	# make sure we have most updated cli_id data
 	if cli_id in clients_dict:
-		print ("yeet")
 		if clients_dict[cli_id]['cli_time'] > cli_time:
 			return None
 
@@ -108,8 +110,9 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 	# send back response message and flood other servrers
 	at_response = "AT %s %s %s %s %s" % (serv_name, str(float(cli_time) - start_time), cli_id, lat_long, start_time)
 	await flood_to_servers(cli_id, at_response)
-	#await send_response(w, at_response)
+	await send_response(w, at_response)
 	await log_io('AT response to IAMAT:\n' + at_response + '\n')
+
 
 # make Nearby Search request
 async def make_ns_request(session, curr_cli, radius, num_results):
@@ -166,14 +169,23 @@ async def handle_commands(line_list, w):
 		await log_io("? %s" % (command))
 		return
 
-	# IAMAT
+	# IAMAT - client sent IAMAT command
 	if command == "IAMAT":
 		await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
 
-	# WHATSAT
+	# WHATSAT - client sent WHATSAT command
 	if command == "WHATSAT":
 		await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
 
+	# AT - server propagates at message to other servers
+	if command == "AT":
+		at_response = ""
+		for word in line_list:
+			at_response += word
+			at_response += " "
+
+		await log_io("Receiving propagated AT:\n %s\n\n" % (at_response))
+		await send_response(w, at_response)
 
 # main function
 
