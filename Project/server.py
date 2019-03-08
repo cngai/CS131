@@ -4,8 +4,6 @@ import time # for POSIX time accesss and conversions
 import aiohttp # for async HTTP client/server
 import json # for JSONs
 
-# port allocation numbers 11790-11794
-
 # global variables
 
 # create nested dict of servers to port numbers and commumication patterns
@@ -140,10 +138,17 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	# https://aiohttp.readthedocs.io/en/stable/
 	async with aiohttp.ClientSession() as session:
 		places_json = await make_ns_request(session, curr_cli, radius, int(upper_bound))
-		places_string = json.dumps(places_json) # turn into JSON string so we can output
+		places_string = json.dumps(places_json, indent=1) # turn into JSON string so we can output
+		new_places_string = ""
+		count = 0
+		for i, j in enumerate(places_string[:-1]):
+			new_places_string += j
+			if j == '\n' and places_string[i+1] == '{':
+				new_places_string += '...'
+				break
 
 		# send response message back
-		at_response = "AT %s %s %s %s %s %s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, places_string)
+		at_response = "AT %s %s %s %s %s\n%s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, new_places_string)
 		await log_io('AT response to WHATSAT:\n' + at_response + '\n')
 		await send_response(w, at_response)
 
@@ -176,8 +181,6 @@ async def handle_at(cli_id, lat_long, cli_time, start_time, w, at_response):
 
 # handle all types of requests
 async def handle_commands(line_list, w):
-	#print ("handle_commands function")
-
 	# get time in seconds since epoch
 	start_time = time.time()
 
@@ -221,9 +224,9 @@ async def handle_commands(line_list, w):
 async def handle_reader(r, w):
 	# loop through reader and decode lines
 	while not r.at_eof():
-		line = await r.readline()
+		line = await r.read()
 		dec_line = line.decode(encoding='UTF-8', errors='strict') # decode line with UTF-8 encoding
-		line_list = dec_line.split(' ')	# put words in line into list
+		line_list = dec_line.split()	# put words in line into list
 		await handle_commands(line_list, w)
 
 # accept client and create asyncio task
