@@ -6,6 +6,8 @@ import json # for JSONs
 
 # port allocation numbers 11790-11794
 
+# global variables
+
 # create nested dict of servers to port numbers and commumication patterns
 servers_dict = {
 	'Goloman': { 'port': 11790, 'comm_patt': ['Hands', 'Holiday', 'Wilkes'] },
@@ -15,13 +17,7 @@ servers_dict = {
 	'Wilkes': { 'port': 11794, 'comm_patt': ['Goloman', 'Hands', 'Holiday'] }
 }
 
-# dictionary to hold all clients
-clients_dict = {}
-
-# global variables
-# serv_name = ""
-#log_file = ""
-# event_loop = ""
+clients_dict = {}	# dictionary to hold all clients
 async_tasks = {}	# dictionary to hold async tasks
 address = "127.0.0.1"
 key = 'AIzaSyD_K5I-vj1KmbmfguQ1fM4-t7us048XaaQ'	# API key for Google API
@@ -56,7 +52,8 @@ async def flood_to_servers(cli_id, at_response):
 			#print("Unable to open connection to %s with address %s and port %d" % (other_server, address, servers_dict[other_server]['port']))
 			r, w = await asyncio.open_connection(address, servers_dict[other_server]['port'], loop=event_loop)
 			await send_response(w, at_response)
-			print('Successfully opened connection to %s' % (other_server))
+			await log_io("Flooding AT message to %s:\n%s\n\n" % (other_server, at_response))
+			print('Flooding AT message to %s:\n%s\n' % (other_server, at_response))
 		except:
 			print('ERROR: unable to propogate message to %s' % (other_server))
 			await log_io('ERROR: unable to propogate message to %s\n' % (other_server))
@@ -87,7 +84,6 @@ def convert_lat_long(lat_long):
 
 # handle IAMAT commands
 async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
-	print("Handling IAMAT")
 	# get latitude and longitude from ISO 6709 notation
 	latitude, longitude = convert_lat_long(lat_long)
 
@@ -112,12 +108,8 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 	# send back response message and flood other servrers
 	at_response = "AT %s %s %s %s %s" % (serv_name, str(float(cli_time) - start_time), cli_id, lat_long, start_time)
 	await flood_to_servers(cli_id, at_response)
-	await send_response(w, at_response)
+	#await send_response(w, at_response)
 	await log_io('AT response to IAMAT:\n' + at_response + '\n')
-
-# handle AT commands
-# async def handle_at(serv_id, time_diff, cli_id, lat_long, cli_time, serv_name):
-# 	if
 
 # make Nearby Search request
 async def make_ns_request(session, curr_cli, radius, num_results):
@@ -135,9 +127,10 @@ async def make_ns_request(session, curr_cli, radius, num_results):
 # handle WHATSAT commands
 async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	# check if valid client
-	if cli_id not in clients:
-		await log_io('WHATSAT command sent by invalid client\n')
-		await send_response(w, 'WHATSAT command sent by invalid client\n')
+	if cli_id not in clients_dict:
+		await log_io('? WHATSAT\n')
+		await send_response(w, '? WHATSAT')
+		return # break out of function
 
 	# get current client from dict
 	curr_cli = clients_dict[cli_id]
@@ -146,7 +139,6 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	async with aiohttp.ClientSession() as session:
 		places_json = await make_ns_request(session, curr_cli, radius, int(upper_bound))
 		places_string = json.dumps(places_json) # turn into JSON string so we can output
-		print(places_string) # for debugging
 
 		# send response message back
 		at_response = "AT %s %s %s %s %s %s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, places_string)
@@ -155,7 +147,7 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 
 
 # handle all types of requests
-async def handle_commands(line_list, req, w):
+async def handle_commands(line_list, w):
 	#print ("handle_commands function")
 
 	# get time in seconds since epoch
@@ -166,17 +158,17 @@ async def handle_commands(line_list, req, w):
 
 	# check if valid command
 	if command != "IAMAT" and command != "AT" and command != "WHATSAT":
-		print("ERROR: invalid command of '%s'. Now exiting." % (command))
-		exit(1)
+		# deal with ^C
+		if command == '':
+			return
+
+		print("? %s" % (command))
+		await log_io("? %s" % (command))
+		return
 
 	# IAMAT
 	if command == "IAMAT":
-		print("Received AN IAMAT command.")
 		await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
-
-	# AT
-	# if command == "AT":
-	# 	handle_at(line_list[1], line_list[2], line_list[3], line_list[4], line_list[5], serv_name)
 
 	# WHATSAT
 	if command == "WHATSAT":
@@ -187,14 +179,12 @@ async def handle_commands(line_list, req, w):
 
 # iterate through lines of reader and handle requests 
 async def handle_reader(r, w):
-	# loop through reader
+	# loop through reader and decode lines
 	while not r.at_eof():
 		line = await r.readline()
-
-		# NOT SURE IF I NEED THIS
 		dec_line = line.decode(encoding='UTF-8', errors='strict') # decode line with UTF-8 encoding
 		line_list = dec_line.split(' ')	# put words in line into list
-		await handle_commands(line_list, dec_line, w)
+		await handle_commands(line_list, w)
 
 # accept client and create asyncio task
 def handle_queries(r, w):
@@ -205,7 +195,6 @@ def handle_queries(r, w):
 	async_tasks[t] = (r, w) # put task in dictionary
 
 	# close client when finished
-
 	def close_task(t):
 		del async_tasks[t]
 		w.close()	# close writer
@@ -243,7 +232,8 @@ def main():
 	# run event loop to process events and handle client requests
 	server = event_loop.run_until_complete(serv_coro)
 
-	print('Starting server on %s via port %d' % (address, port_num))
+	print('Starting %s server on %s via port %d' % (serv_name, address, port_num))
+	log_file.write('Starting %s server on %s via port %d\n\n' % (serv_name, address, port_num))
 
 	event_loop.run_forever()
 
