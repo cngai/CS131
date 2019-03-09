@@ -187,19 +187,29 @@ async def handle_commands(line_list, w):
 		if command == '':
 			return
 
-		print("? %s" % (command))
-		await log_io("? %s" % (command))
+		print("? %s\n" % (command))
+		await log_io("? %s\n\n" % (command))
 		return
 
 	# IAMAT - client sent IAMAT command
 	if command == "IAMAT":
-		await log_io("Received IAMAT from client\n\n")
-		await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
+		if len(line_list) == 4:
+			await log_io("Received IAMAT from client\n\n")
+			await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
+		else:
+			print("? %s\n" % (command))
+			await log_io("? %s\n\n" % (command))
+			return
 
 	# WHATSAT - client sent WHATSAT command
 	if command == "WHATSAT":
-		await log_io("Received WHATSAT from client\n\n")
-		await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
+		if len(line_list) == 4:
+			await log_io("Received WHATSAT from client\n\n")
+			await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
+		else:
+			print("? %s\n" % (command))
+			await log_io("? %s\n\n" % (command))
+			return
 
 	# AT - server propagates at message to other servers
 	if command == "AT":
