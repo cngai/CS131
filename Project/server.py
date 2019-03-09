@@ -139,17 +139,10 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	# https://aiohttp.readthedocs.io/en/stable/
 	async with aiohttp.ClientSession() as session:
 		places_json = await make_ns_request(session, curr_cli, radius, int(upper_bound))
-		places_string = json.dumps(places_json, indent=1) # turn into JSON string so we can output
-		new_places_string = ""
-		count = 0
-		for i, j in enumerate(places_string[:-1]):
-			new_places_string += j
-			if j == '\n' and places_string[i+1] == '{':
-				new_places_string += '...'
-				break
+		places_string = json.dumps(places_json, indent=3, separators=(', ', ' : ')) # turn into JSON string so we can output
 
 		# send response message back
-		at_response = "AT %s %s %s %s %s\n%s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, new_places_string)
+		at_response = "AT %s %s %s %s %s\n%s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, places_string)
 		await log_io('AT response to WHATSAT:\n' + at_response + '\n')
 		await send_response(w, at_response)
 
