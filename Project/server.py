@@ -89,14 +89,14 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 
 	# make sure we have most updated cli_id data
 	if cli_id in clients_dict:
-		if float(clients_dict[cli_id]['cli_time']) > float(cli_time):
+		if float(cli_time) < float(clients_dict[cli_id]['cli_time']):
 			return None
 
 	# define curr_cli object
 	curr_cli = {
 		'latitude': latitude,
 		'longitude': longitude,
-		'time_difference': float(cli_time) - start_time,
+		'time_difference': start_time - float(cli_time),
 		'cli_time': cli_time,
 		'serv_name': serv_name
 	}
@@ -104,8 +104,13 @@ async def handle_iamat(cli_id, lat_long, cli_time, start_time, w):
 	# add curr_cli to clients_dict
 	clients_dict[cli_id] = curr_cli
 
+	# add sign to time difference
+	time_diff_string = ""
+	if (start_time - float(cli_time)) >= 0:
+		time_diff_string += "+"
+
 	# send back response message and flood other servrers
-	at_response = "AT %s %s %s %s %s" % (serv_name, str(float(cli_time) - start_time), cli_id, lat_long, start_time)
+	at_response = "AT %s %s %s %s %s" % (serv_name, time_diff_string + str(start_time - float(cli_time)), cli_id, lat_long, cli_time)
 	await flood_to_servers(cli_id, at_response)
 	await send_response(w, at_response)
 	await log_io('AT response to IAMAT:\n' + at_response + '\n\n')
@@ -141,8 +146,13 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 		places_json = await make_ns_request(session, curr_cli, radius, int(upper_bound))
 		places_string = json.dumps(places_json, indent=3, separators=(', ', ' : ')) # turn into JSON string so we can output
 
+		# add sign to time difference
+		time_diff_string = ""
+		if curr_cli['time_difference'] >= 0:
+			time_diff_string += "+"
+
 		# send response message back
-		at_response = "AT %s %s %s %s %s\n%s" % (serv_name, curr_cli['time_difference'], cli_id, curr_cli['latitude'] + curr_cli['longitude'], start_time, places_string)
+		at_response = "AT %s %s %s %s %s\n%s" % (serv_name, time_diff_string + str(curr_cli['time_difference']), cli_id, curr_cli['latitude'] + curr_cli['longitude'], curr_cli['cli_time'], places_string)
 		await log_io('AT response to WHATSAT:\n' + at_response + '\n')
 		await send_response(w, at_response)
 
@@ -150,7 +160,7 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 async def handle_at(cli_id, lat_long, cli_time, start_time, w, at_response):
 	# check if already flooded
 	if cli_id in clients_dict:
-		if float(clients_dict[cli_id]['cli_time']) == float(cli_time):
+		if float(cli_time) == float(clients_dict[cli_id]['cli_time']):
 			await log_io('Already flooded %s server. Stopping propagation.\n\n' % (serv_name))
 			return
 
@@ -160,7 +170,7 @@ async def handle_at(cli_id, lat_long, cli_time, start_time, w, at_response):
 	curr_cli = {
 		'latitude': latitude,
 		'longitude': longitude,
-		'time_difference': float(cli_time) - start_time,
+		'time_difference': start_time - float(cli_time),
 		'cli_time': cli_time,
 		'serv_name': serv_name
 	}
@@ -179,7 +189,10 @@ async def handle_commands(line_list, w):
 	start_time = time.time()
 
 	# either IAMAT, AT, or WHATSAT
-	command = line_list[0]
+	if len(line_list) > 0:
+		command = line_list[0]
+	else:
+		command = ""
 
 	# check if valid command
 	if command != "IAMAT" and command != "AT" and command != "WHATSAT":
