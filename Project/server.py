@@ -134,8 +134,8 @@ async def make_ns_request(session, curr_cli, radius, num_results):
 async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 	# check if valid client
 	if cli_id not in clients_dict:
-		await log_io('? WHATSAT\n\n')
-		await send_response(w, '? WHATSAT')
+		await log_io('? WHATSAT %s %d %d\n\n' % (cli_id, radius, upper_bound))
+		await send_response(w, '? WHATSAT %s %d %d')
 		return # break out of function
 
 	# get current client from dict
@@ -160,7 +160,7 @@ async def handle_whatsat(cli_id, radius, upper_bound, start_time, w):
 async def handle_at(cli_id, lat_long, cli_time, start_time, w, at_response):
 	# check if already flooded
 	if cli_id in clients_dict:
-		if float(cli_time) == float(clients_dict[cli_id]['cli_time']):
+		if float(cli_time) <= float(clients_dict[cli_id]['cli_time']):
 			await log_io('Already flooded %s server. Stopping propagation.\n\n' % (serv_name))
 			return
 
@@ -184,7 +184,7 @@ async def handle_at(cli_id, lat_long, cli_time, start_time, w, at_response):
 
 
 # handle all types of requests
-async def handle_commands(line_list, w):
+async def handle_commands(line_list, entire_command, w):
 	# get time in seconds since epoch
 	start_time = time.time()
 
@@ -200,28 +200,45 @@ async def handle_commands(line_list, w):
 		if command == '':
 			return
 
-		print("? %s\n" % (command))
-		await log_io("? %s\n\n" % (command))
+		print("? %s\n" % (entire_command))
+		await log_io("? %s\n\n" % (entire_command))
+		await send_response(w, "? %s" % (entire_command))
 		return
 
 	# IAMAT - client sent IAMAT command
 	if command == "IAMAT":
 		if len(line_list) == 4:
-			await log_io("Received IAMAT from client\n\n")
-			await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
+			try:
+				await log_io("Received IAMAT from client\n\n")
+				await handle_iamat(line_list[1], line_list[2], line_list[3], start_time, w)
+			# in case one of args is not correct data type
+			except:
+				print("? %s\n" % (entire_command))
+				await log_io("? %s\n\n" % (entire_command))
+				await send_response(w, "? %s" % (entire_command))
+				return
 		else:
-			print("? %s\n" % (command))
-			await log_io("? %s\n\n" % (command))
+			print("? %s\n" % (entire_command))
+			await log_io("? %s\n\n" % (entire_command))
+			await send_response(w, "? %s" % (entire_command))
 			return
 
 	# WHATSAT - client sent WHATSAT command
 	if command == "WHATSAT":
 		if len(line_list) == 4:
-			await log_io("Received WHATSAT from client\n\n")
-			await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
+			try:
+				await log_io("Received WHATSAT from client\n\n")
+				await handle_whatsat(line_list[1], line_list[2], line_list[3], start_time, w)
+			# in case one of args is not correct data type
+			except:
+				print("? %s\n" % (entire_command))
+				await log_io("? %s\n\n" % (entire_command))
+				await send_response(w, "? %s" % (entire_command))
+				return
 		else:
-			print("? %s\n" % (command))
-			await log_io("? %s\n\n" % (command))
+			print("? %s\n" % (entire_command))
+			await log_io("? %s\n\n" % (entire_command))
+			await send_response(w, "? %s" % (entire_command))
 			return
 
 	# AT - server propagates at message to other servers
@@ -244,7 +261,7 @@ async def handle_reader(r, w):
 		line = await r.read()
 		dec_line = line.decode(encoding='UTF-8', errors='strict') # decode line with UTF-8 encoding
 		line_list = dec_line.split()	# put words in line into list
-		await handle_commands(line_list, w)
+		await handle_commands(line_list, dec_line, w)
 
 # accept client and create asyncio task
 async def handle_queries(r, w):
